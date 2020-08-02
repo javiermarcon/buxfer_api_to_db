@@ -2,8 +2,10 @@
 import requests
 import time
 from django.shortcuts import render,redirect
-#from rest_framework import viewsets
+from rest_framework import viewsets
 from django.conf import settings
+from .serializers import AccountSerializer
+from .models import Account
 
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
@@ -73,3 +75,8 @@ def accounts_import(request):
         for acc in data['data']['response']['accounts']:
             print(acc)
     return render(request, "buxfer_api/accounts_imported.html", {'status': data['status']})
+
+class AccountViewSet(viewsets.ModelViewSet):
+    queryset = Account.objects.all().order_by('name')
+    serializer_class = AccountSerializer
+
