@@ -2,20 +2,17 @@
 import requests
 import time
 from django.shortcuts import render,redirect
+#from rest_framework import viewsets
+from django.conf import settings
 
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
-
-MAX_RETRIES = 5  # Arbitrary number of times we want to try
-BUXFER_BASE_URL = "https://www.buxfer.com/api"
-USER = ""
-PASS = ""
 
 
 def buxfer_login(request):
     ''' performs the login in the buxfer api and returns the token and a status text '''
     response = requests.get("%s/login?userid=%s" \
-                            "&password=%s" % (BUXFER_BASE_URL, USER, PASS))
+                            "&password=%s" % (settings.BUXFER_CONN['url'], settings.BUXFER_CONN['user'], settings.BUXFER_CONN['pass']))
 
     if response.status_code != 200:
         return (None, get_err_msg(response))
@@ -37,7 +34,9 @@ def get_err_msg(response):
     ''' Formats the error message of a requests response'''
     data = response.json()
     err_type = data['error']['type']
-    return "({}) {}" - format(response.status_code, err_type)
+    err_msg = data['error']['message']
+    print((response, data, err_type))
+    return "({}) {} {}".format(response.status_code, err_type, err_msg)
 
 
 def buxfer_api_fetch(request, resource):
@@ -48,11 +47,11 @@ def buxfer_api_fetch(request, resource):
     :return: dictionary containing the data of the request in json and a string inidcating 'ok' or 'error'
     '''
     attempt_num = 0  # keep track of how many times we've retried
-    while attempt_num < MAX_RETRIES:
+    while attempt_num < settings.BUXFER_CONN['max_retiries']:
         (token, status) = buxfer_get_token(request)
         if not token:
             return {'data': 'Buxfer Login Error', 'status': 'error'}
-        url = "%s/%s?token=%s" % (BUXFER_BASE_URL,
+        url = "%s/%s?token=%s" % (settings.BUXFER_CONN['url'],
                                   resource, token)
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
@@ -73,4 +72,4 @@ def accounts_import(request):
     if data['status'] == 'ok':
         for acc in data['data']['response']['accounts']:
             print(acc)
-    return render(request, "accounts_imported.html")
+    return render(request, "buxfer_api/accounts_imported.html")
