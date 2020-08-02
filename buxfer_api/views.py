@@ -35,7 +35,6 @@ def get_err_msg(response):
     data = response.json()
     err_type = data['error']['type']
     err_msg = data['error']['message']
-    print((response, data, err_type))
     return "({}) {} {}".format(response.status_code, err_type, err_msg)
 
 
@@ -50,7 +49,7 @@ def buxfer_api_fetch(request, resource):
     while attempt_num < settings.BUXFER_CONN['max_retiries']:
         (token, status) = buxfer_get_token(request)
         if not token:
-            return {'data': 'Buxfer Login Error', 'status': 'error'}
+            return {'data': None, 'status': 'Buxfer Login Error: {}'.format(status)}
         url = "%s/%s?token=%s" % (settings.BUXFER_CONN['url'],
                                   resource, token)
         response = requests.get(url, timeout=10)
@@ -63,13 +62,14 @@ def buxfer_api_fetch(request, resource):
             time.sleep(5)  # Wait for 5 seconds before re-trying
 
     err_msg = get_err_msg(response)
-    return {'data': err_msg, 'status': 'error' }
+    return {'data': None, 'status': 'Error: {}'.format(err_msg) }
 
 
 def accounts_import(request):
     ''' Imports the transactions from buxfer '''
     data = buxfer_api_fetch(request, 'accounts')
+    print(data)
     if data['status'] == 'ok':
         for acc in data['data']['response']['accounts']:
             print(acc)
-    return render(request, "buxfer_api/accounts_imported.html")
+    return render(request, "buxfer_api/accounts_imported.html", {'status': data['status']})
