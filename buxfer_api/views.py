@@ -70,11 +70,14 @@ def buxfer_api_fetch(request, resource):
 def accounts_import(request):
     ''' Imports the transactions from buxfer '''
     data = buxfer_api_fetch(request, 'accounts')
-    print(data)
+    result = []
     if data['status'] == 'ok':
         for acc in data['data']['response']['accounts']:
-            print(acc)
-    return render(request, "buxfer_api/accounts_imported.html", {'status': data['status']})
+            serializer = AccountSerializer(data=acc)
+            if serializer.is_valid():
+                embed = serializer.save()
+                result.append(embed)
+    return render(request, "buxfer_api/accounts_imported.html", {'status': data['status'], 'data': result})
 
 class AccountViewSet(viewsets.ModelViewSet):
     queryset = Account.objects.all().order_by('name')
