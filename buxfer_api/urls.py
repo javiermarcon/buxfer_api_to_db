@@ -4,4 +4,5 @@ from . import views
 
 urlpatterns = [
     path('buxfer/accounts/import/', views.accounts_import),
+    path('buxfer/tags/import/', views.tags_import),
 ]

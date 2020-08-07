@@ -22,7 +22,7 @@ TRANSACTION_TYPES = {
     }
 
 class Account(ProjectBaseModel):
-    id = models.IntegerField(primary_key=True)
+    id = models.CharField(max_length=64, primary_key=True)
     name = models.CharField(max_length=200)
     currency = models.CharField(max_length=3)
     bank = models.CharField(max_length=200)
@@ -30,13 +30,7 @@ class Account(ProjectBaseModel):
     lastSynced = models.DateTimeField('Last Sync')
 
 
-"""
-    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='users')
-    # Empresa esta en el profile
-    area = models.CharField(max_length=200)  # Área
-    reference_number = models.CharField(max_length=50)  # Número de referencia interno
-    quotation_type = models.CharField(max_length=50, choices=TYPE)
-    delivery_date = models.DateTimeField('Fecha de entrega')  # Fecha entrega requerida
-    reference_price = models.FloatField()
-    notify_all = models.BooleanField(blank=True)
-"""
+class Tag(ProjectBaseModel):
+    id = models.CharField(max_length=64, primary_key=True)
+    name = models.CharField(max_length=200)
+    parentId = models.CharField(max_length=64)

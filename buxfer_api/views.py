@@ -4,7 +4,7 @@ import time
 from django.shortcuts import render,redirect
 from rest_framework import viewsets
 from django.conf import settings
-from .serializers import AccountSerializer
+from .serializers import AccountSerializer, TagSerializer
 from .models import Account
 
 # Create your views here.
@@ -67,19 +67,26 @@ def buxfer_api_fetch(request, resource):
     return {'data': None, 'status': 'Error: {}'.format(err_msg) }
 
 
-def accounts_import(request):
-    ''' Imports the transactions from buxfer '''
-    data = buxfer_api_fetch(request, 'accounts')
+def data_import(request, action, serializerClass):
+    ''' Imports data from buxfer '''
+    data = buxfer_api_fetch(request, action)
     result = []
     if data['status'] == 'ok':
-        for acc in data['data']['response']['accounts']:
-            serializer = AccountSerializer(data=acc)
+        for acc in data['data']['response'][action]:
+            serializer = serializerClass(data=acc)
             if serializer.is_valid():
                 embed = serializer.save()
                 result.append(embed)
-    return render(request, "buxfer_api/accounts_imported.html", {'status': data['status'], 'data': result})
+    return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action})
 
-class AccountViewSet(viewsets.ModelViewSet):
-    queryset = Account.objects.all().order_by('name')
-    serializer_class = AccountSerializer
+def accounts_import(request):
+    ''' Imports the accounts'''
+    action = 'accounts'
+    serializerClass = AccountSerializer
+    return data_import(request, action, serializerClass)
 
+def tags_import(request):
+    ''' Imports the accounts'''
+    action = 'tags'
+    serializerClass = TagSerializer
+    return data_import(request, action, serializerClass)
