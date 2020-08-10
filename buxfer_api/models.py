@@ -22,15 +22,21 @@ TRANSACTION_TYPES = {
     }
 
 class Account(ProjectBaseModel):
-    id = models.CharField(max_length=64, primary_key=True)
+    id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=200)
     currency = models.CharField(max_length=3)
     bank = models.CharField(max_length=200)
     balance = models.FloatField()
-    lastSynced = models.DateTimeField('Last Sync')
+    lastSynced = models.DateTimeField('Last Sync', blank=True, null=True)
 
+    def __str__(self):
+        return f"{self.name}, id= {self.id}, currency= {self.currency} "
 
 class Tag(ProjectBaseModel):
-    id = models.CharField(max_length=64, primary_key=True)
+    id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=200)
     parentId = models.CharField(max_length=64)
+
+    def __str__(self):
+        return f"{self.name}, id= {self.id} "
+

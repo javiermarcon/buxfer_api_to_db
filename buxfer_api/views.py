@@ -1,11 +1,12 @@
 #from django.shortcuts import render
 import requests
 import time
+import six
 from django.shortcuts import render,redirect
 from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer
-from .models import Account
+from .models import Account, Tag
 
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
@@ -66,27 +67,53 @@ def buxfer_api_fetch(request, resource):
     err_msg = get_err_msg(response)
     return {'data': None, 'status': 'Error: {}'.format(err_msg) }
 
+def has_changed(record, data):
+    for key in data:
+        #print(getattr(record, key, None))
+        if data[key] != getattr(record, key, None):
+            return True
+    return False
 
-def data_import(request, action, serializerClass):
+def data_import(request, action, modelClass, serializerClass):
     ''' Imports data from buxfer '''
     data = buxfer_api_fetch(request, action)
     result = []
     if data['status'] == 'ok':
+        queryset = dict([(x.id, x) for x in modelClass.objects.all()])
+        keys = list(six.iterkeys(queryset))
+        serialized_keys = []
+        #import pdb; pdb.set_trace()
         for acc in data['data']['response'][action]:
-            serializer = serializerClass(data=acc)
+            # si uso many=True en el serializer, graba solo algunos
+            if acc['id'] in keys:
+                db_rec = queryset[acc['id']]
+                if has_changed(db_rec, acc):
+                    serializer = serializerClass(db_rec, data=acc)
+                else:
+                    result.append('{} not changed'.format(acc['id']))
+            else:
+                serializer = serializerClass(data=acc)
             if serializer.is_valid():
+                serialized_keys.append(acc['id'])
                 embed = serializer.save()
                 result.append(embed)
-    return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action})
+            else:
+                result.append(serializer.errors)
+        # delete the ones that are not in buxfer anymore
+        to_delete = [x for x in keys if x not in serialized_keys]
+        modelClass.objects.filter(pk__in=to_delete).delete()
+    return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action, 'deleted': to_delete})
 
 def accounts_import(request):
     ''' Imports the accounts'''
     action = 'accounts'
     serializerClass = AccountSerializer
-    return data_import(request, action, serializerClass)
+    model = Account
+    return data_import(request, action, model, serializerClass)
 
 def tags_import(request):
     ''' Imports the accounts'''
     action = 'tags'
     serializerClass = TagSerializer
-    return data_import(request, action, serializerClass)
+    model = Tag
+    return data_import(request, action, model, serializerClass)
