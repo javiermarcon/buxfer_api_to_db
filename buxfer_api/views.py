@@ -5,9 +5,9 @@ import six
 from django.shortcuts import render,redirect
 from rest_framework import viewsets
 from django.conf import settings
-from .serializers import AccountSerializer, TagSerializer
-from .models import Account, Tag
-
+from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
+from .models import Account, Tag, Transaction
+import pprint
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
 
@@ -83,7 +83,11 @@ def data_import(request, action, modelClass, serializerClass):
         keys = list(six.iterkeys(queryset))
         serialized_keys = []
         #import pdb; pdb.set_trace()
+        if action == 'transactions':
+            numTransactions = data['data']['response']['numTransactions']
+            print(numTransactions)
         for acc in data['data']['response'][action]:
+            pprint.pprint(acc)
             # si uso many=True en el serializer, graba solo algunos
             if acc['id'] in keys:
                 db_rec = queryset[acc['id']]
@@ -116,4 +120,13 @@ def tags_import(request):
     action = 'tags'
     serializerClass = TagSerializer
     model = Tag
+    return data_import(request, action, model, serializerClass)
+
+def transactions_import(request):
+    ''' Imports the accounts'''
+    #accounts_import(request)
+    #tags_import(request)
+    action = 'transactions'
+    serializerClass = TransactionSerializer
+    model = Transaction
     return data_import(request, action, model, serializerClass)
