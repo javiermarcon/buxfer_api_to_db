@@ -38,8 +38,6 @@ class Tag(ProjectBaseModel):
     parentId = models.IntegerField(blank=True, null=True)
     relativeName = models.CharField(max_length=100)
 
-
-
     def __str__(self):
         return f"{self.name}, id= {self.id} "
 
@@ -57,7 +55,7 @@ class Transaction(ProjectBaseModel):
     #rawTransactionType: 6,
     amount = models.FloatField()
     expenseAmount = models.FloatField()
-    accountId = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions')
+    accountId = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions', blank=True, null=True)
     #accountName
     tags = models.ManyToManyField('Tag', related_name='transactions')
     status = models.CharField(max_length=200)

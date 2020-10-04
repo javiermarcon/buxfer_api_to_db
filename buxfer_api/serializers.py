@@ -24,23 +24,40 @@ class TransactionTypeSerializer(serializers.ModelSerializer):
         fields = ('id', 'name')
 
 class TransactionSerializer(serializers.ModelSerializer):
-    tagNames = serializers.CharField(source='tags') #serializers.SerializerMethodField('get_tag_id', source='tags')
-    #tags = TagSerializer(read_only=True, many=True) # llamar a transactionserializer con many= True para que sea man to many
+    #tagNames = serializers.CharField(source='tags') #serializers.SerializerMethodField('get_tag_id', source='tags')
+    tagNames = TagSerializer(read_only=True, many=True, source='tags') # llamar a transactionserializer con many= True para que sea man to many
     #transactionType = TransactionTypeSerializer(read_only=True) # ReadOnlyField(source='TransactionType.name')
     #accountId = ReadOnlyField(source='Account.id')
     #fromAccount = ReadOnlyField(source='Account.name')
     #toAccount = ReadOnlyField(source='Account.name')
 
     def to_internal_value(self, data):
-        import pdb
-        pdb.set_trace()
+
         if data['tagNames']:
             tags_qs = Q()
             for tag in data['tagNames']:
                 tags_qs = tags_qs | Q(name=tag)
             tag_objs = Tag.objects.filter(tags_qs)
             data['tagNames'] = [x.id for x in tag_objs]
-        data['transactionType'] = 10
+
+        if 'fromAccount' in data and data['fromAccount']:
+            data['fromAccount'] = data['fromAccount']['id']
+        if 'toAccount' in data and data['toAccount']:
+            data['toAccount'] = data['toAccount']['id']
+        transaction_type = TransactionType.objects.filter(name=data['transactionType'])
+        if not transaction_type:
+            transaction_type = TransactionType(id=data['rawTransactionType'], name=data['transactionType'])
+            transaction_type.save()
+        else:
+            transaction_type = transaction_type[0]
+        try:
+            print(transaction_type.id)
+            #import pdb
+            #pdb.set_trace()
+            data['transactionType'] = transaction_type.id
+        except Exception as e:
+            print(e)
+        print(data)
         return super(TransactionSerializer, self).to_internal_value(data)
 
     #def get_tag_id(self, obj):

@@ -56,6 +56,7 @@ def buxfer_api_fetch(request, resource):
         url = "%s/%s?token=%s" % (settings.BUXFER_CONN['url'],
                                   resource, token)
         response = requests.get(url, timeout=10)
+        print(url)
         if response.status_code == 200:
             data = response.json()
             return {'data': data, 'status': 'ok' }
@@ -87,6 +88,7 @@ def data_import(request, action, modelClass, serializerClass):
             numTransactions = data['data']['response']['numTransactions']
             print(numTransactions)
         for acc in data['data']['response'][action]:
+            serializer = None
             pprint.pprint(acc)
             # si uso many=True en el serializer, graba solo algunos
             if acc['id'] in keys:
@@ -97,12 +99,14 @@ def data_import(request, action, modelClass, serializerClass):
                     result.append('{} not changed'.format(acc['id']))
             else:
                 serializer = serializerClass(data=acc)
-            if serializer.is_valid():
-                serialized_keys.append(acc['id'])
-                embed = serializer.save()
-                result.append(embed)
-            else:
-                result.append(serializer.errors)
+
+            if serializer:
+                if serializer.is_valid():
+                    serialized_keys.append(acc['id'])
+                    embed = serializer.save()
+                    result.append(embed)
+                else:
+                    result.append(serializer.errors)
         # delete the ones that are not in buxfer anymore
         to_delete = [x for x in keys if x not in serialized_keys]
         modelClass.objects.filter(pk__in=to_delete).delete()
@@ -124,8 +128,8 @@ def tags_import(request):
 
 def transactions_import(request):
     ''' Imports the accounts'''
-    #accounts_import(request)
-    #tags_import(request)
+    accounts_import(request)
+    tags_import(request)
     action = 'transactions'
     serializerClass = TransactionSerializer
     model = Transaction
