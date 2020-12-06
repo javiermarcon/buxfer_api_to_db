@@ -7,6 +7,7 @@ from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
 from .models import Account, Tag, Transaction
+from .forms import AccountFormSet
 import pprint
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
@@ -75,7 +76,7 @@ def has_changed(record, data):
             return True
     return False
 
-def data_import(request, action, modelClass, serializerClass):
+def data_import(request, action, modelClass, serializerClass, formSetClass=None):
     ''' Imports data from buxfer '''
     data = buxfer_api_fetch(request, action)
     result = []
@@ -108,16 +109,28 @@ def data_import(request, action, modelClass, serializerClass):
                 else:
                     result.append(serializer.errors)
         # delete the ones that are not in buxfer anymore
-        to_delete = [x for x in keys if x not in serialized_keys]
-        modelClass.objects.filter(pk__in=to_delete).delete()
-    return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action, 'deleted': to_delete})
+        to_delete = None # [x for x in keys if x not in serialized_keys]
+        #modelClass.objects.filter(pk__in=to_delete).delete()
+        if formSetClass:
+            if request.method == 'POST':
+                formset = formSetClass(request.POST, request.FILES)
+                if formset.is_valid():
+                    # do something with the formset.cleaned_data
+                    pass
+            else:
+                formset = formSetClass()
+        else:
+            formset = None
+    return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action,
+                                                             'deleted': to_delete, 'formset': formset})
 
 def accounts_import(request):
     ''' Imports the accounts'''
     action = 'accounts'
     serializerClass = AccountSerializer
     model = Account
-    return data_import(request, action, model, serializerClass)
+    formSetClass = AccountFormSet
+    return data_import(request, action, model, serializerClass, formSetClass)
 
 def tags_import(request):
     ''' Imports the accounts'''

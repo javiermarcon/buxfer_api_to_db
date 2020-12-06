@@ -11,6 +11,52 @@ class ProjectBaseModel(models.Model):
     class Meta:
         abstract = True
 
+DISCRECIONALIDADES = {
+        ('F', 'F'), # Fijo
+        ('V', 'V'), # Variable
+        ('D', 'D'), # Discrecional
+    }
+
+TIPOS_CAT = {
+        'i': [
+            1,   # settlement
+            4,   # income
+            9,   # refund
+            11,   # investment sale
+            12,   # dividend
+        ],
+        'e': [
+            3,   # expense
+            10,   # investment purchase
+            8,   # loan
+        ]
+    }
+#6	transfer
+
+CAT_PRINCIPALES = {
+    (1, 'HOGAR Y VIVIENDA'),
+    (2, 'AUTOMOVIL Y TRANSPORTE'),
+    (3, 'ALIMENTOS'),
+    (4, 'ROPA'),
+    (5, 'CUIDADO PERSONAL'),
+    (6, 'CUIDADO DE LA SALUD'),
+    (7, 'ENTRETENIMIENTO'),
+    (8, 'REGALOS'),
+    (9, 'EDUCACION'),
+    (10, 'VACACIONES'),
+    (11, 'GASTOS DE NEGOCIOS'),
+    (12, 'CUIDADO Y DEPENDENCIAS'),
+    (13, 'INVERSIONES Y AHORROS'),
+    (14, 'SEGUROS'),
+    (15, 'ESPIRITUAL'),
+    (16, 'DEUDAS REPAGADAS'),
+    (17, 'SERVICIOS'),
+    (18, 'IMPUESTOS'),
+    (19, 'LECCIONES APRENDIDAS'),
+    (20, 'HONORARIOS PAGADOS'),
+
+}
+
 TRANSACTION_TYPES = {
         ('income', 'income'),
         ('expense', 'expense'),
@@ -21,13 +67,23 @@ TRANSACTION_TYPES = {
         ('loan', 'loan')
     }
 
+TIPOS_PAGO = {
+    ('$', '$'), # efectivo
+    ('T', 'T'), # tarjeta
+    ('C', 'C'), # Cheque
+}
+
 class Account(ProjectBaseModel):
     id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=200)
     currency = models.CharField(max_length=3)
     bank = models.CharField(max_length=200)
-    balance = models.FloatField()
-    lastSynced = models.DateTimeField('Last Sync', blank=True, null=True)
+    #balance = models.FloatField()
+    #lastSynced = models.DateTimeField('Last Sync', blank=True, null=True)
+    tipo_pago = models.CharField(max_length=1, default=None, choices=TIPOS_PAGO, blank=True, null=True)
+
+    class Meta:
+        ordering = ['bank', 'name']
 
     def __str__(self):
         return f"{self.name}, id= {self.id}, currency= {self.currency} "
@@ -57,10 +113,24 @@ class Transaction(ProjectBaseModel):
     expenseAmount = models.FloatField()
     accountId = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions', blank=True, null=True)
     #accountName
-    tags = models.ManyToManyField('Tag', related_name='transactions')
+    tags = models.ManyToManyField('Tag', through='TransactionTag', related_name='transactions')
     status = models.CharField(max_length=200)
     isFutureDated = models.BooleanField(blank=True)
     isPending = models.BooleanField(blank=True)
     sortDate = models.DateField(blank=True)
     fromAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactionsFrom', blank=True, null=True)
     toAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactionsTo', blank=True, null=True)
+    discrecionalidad = models.CharField(max_length=1 ,default=None,choices=DISCRECIONALIDADES, blank=True, null=True)
+
+    class Meta:
+        ordering = ['-normalizedDate', 'description']
+        # db_table = u'transaction'
+
+    def __str__(self):
+        return 'fecha: {} cantidad: {} descripcion: {}'.format(self.normalizedDate, self.amount, self.description)
+
+class TransactionTag(models.Model):
+    id = models.IntegerField(primary_key=True)
+    transaction_id = models.ForeignKey(Transaction, on_delete=models.CASCADE, blank=True, null=True)
+    tag_id = models.ForeignKey(Tag, on_delete=models.CASCADE, blank=True, null=True)
+
