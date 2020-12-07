@@ -2,12 +2,13 @@
 import requests
 import time
 import six
+from django.db import DatabaseError
 from django.shortcuts import render,redirect
 from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
 from .models import Account, Tag, Transaction
-from .forms import AccountFormSet
+from .forms import AccountFormSet, TagFormSet
 import pprint
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
@@ -78,49 +79,65 @@ def has_changed(record, data):
 
 def data_import(request, action, modelClass, serializerClass, formSetClass=None):
     ''' Imports data from buxfer '''
-    data = buxfer_api_fetch(request, action)
     result = []
-    if data['status'] == 'ok':
-        queryset = dict([(x.id, x) for x in modelClass.objects.all()])
-        keys = list(six.iterkeys(queryset))
-        serialized_keys = []
-        #import pdb; pdb.set_trace()
-        if action == 'transactions':
-            numTransactions = data['data']['response']['numTransactions']
-            print(numTransactions)
-        for acc in data['data']['response'][action]:
-            serializer = None
-            pprint.pprint(acc)
-            # si uso many=True en el serializer, graba solo algunos
-            if acc['id'] in keys:
-                db_rec = queryset[acc['id']]
-                if has_changed(db_rec, acc):
-                    serializer = serializerClass(db_rec, data=acc)
+    to_delete = None
+    if request.method != 'POST':
+        data = buxfer_api_fetch(request, action)
+        if data['status'] == 'ok':
+            queryset = dict([(x.id, x) for x in modelClass.objects.all()])
+            keys = list(six.iterkeys(queryset))
+            serialized_keys = []
+            #import pdb; pdb.set_trace()
+            if action == 'transactions':
+                numTransactions = data['data']['response']['numTransactions']
+                print(numTransactions)
+            for acc in data['data']['response'][action]:
+                serializer = None
+                pprint.pprint(acc)
+                # si uso many=True en el serializer, graba solo algunos
+                if acc['id'] in keys:
+                    db_rec = queryset[acc['id']]
+                    if has_changed(db_rec, acc):
+                        serializer = serializerClass(db_rec, data=acc)
+                    else:
+                        result.append('{} not changed'.format(acc['id']))
                 else:
-                    result.append('{} not changed'.format(acc['id']))
-            else:
-                serializer = serializerClass(data=acc)
+                    serializer = serializerClass(data=acc)
 
-            if serializer:
-                if serializer.is_valid():
-                    serialized_keys.append(acc['id'])
-                    embed = serializer.save()
-                    result.append(embed)
-                else:
-                    result.append(serializer.errors)
-        # delete the ones that are not in buxfer anymore
-        to_delete = None # [x for x in keys if x not in serialized_keys]
-        #modelClass.objects.filter(pk__in=to_delete).delete()
-        if formSetClass:
-            if request.method == 'POST':
-                formset = formSetClass(request.POST, request.FILES)
-                if formset.is_valid():
-                    # do something with the formset.cleaned_data
-                    pass
-            else:
+                if serializer:
+                    if serializer.is_valid():
+                        serialized_keys.append(acc['id'])
+                        embed = serializer.save()
+                        result.append(embed)
+                    else:
+                        result.append(serializer.errors)
+            # delete the ones that are not in buxfer anymore
+            #to_delete = [x for x in keys if x not in serialized_keys]
+            #modelClass.objects.filter(pk__in=to_delete).delete()
+
+            if formSetClass:
                 formset = formSetClass()
-        else:
-            formset = None
+            else:
+                formset = None
+    else:
+        data = {'status': ''}
+        if formSetClass:
+            formset = formSetClass(request.POST, request.FILES)
+            # import pdb; pdb.set_trace()
+            if formset.is_valid():
+                # do something with the formset.cleaned_data
+                for form in formset:
+                    if form.is_valid():
+                        try:
+                            #if form.cleaned_data.get('DELETE') and form.instance.pk:
+                            #    form.instance.delete()
+                            #else:
+                            form.save()
+                            data['status'] = "Saved."
+                        except DatabaseError as e:
+                            data['status'] = "Error: {}".format(e)
+
+
     return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action,
                                                              'deleted': to_delete, 'formset': formset})
 
@@ -137,7 +154,8 @@ def tags_import(request):
     action = 'tags'
     serializerClass = TagSerializer
     model = Tag
-    return data_import(request, action, model, serializerClass)
+    formSetClass = TagFormSet
+    return data_import(request, action, model, serializerClass, formSetClass)
 
 def transactions_import(request):
     ''' Imports the accounts'''

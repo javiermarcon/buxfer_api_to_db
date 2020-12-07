@@ -68,9 +68,16 @@ TRANSACTION_TYPES = {
     }
 
 TIPOS_PAGO = {
-    ('$', '$'), # efectivo
-    ('T', 'T'), # tarjeta
-    ('C', 'C'), # Cheque
+    ('$', '$ Efectivo'), # efectivo
+    ('T', 'Tarjeta'), # tarjeta
+    ('C', 'Cheque'), # Cheque
+}
+
+TIPOS_TAG = {
+    ('A', 'Activo'),
+    ('P', 'Pasivo'),
+    ('I', 'Ingreso'),
+    ('G', 'Gasto'),
 }
 
 class Account(ProjectBaseModel):
@@ -93,6 +100,8 @@ class Tag(ProjectBaseModel):
     name = models.CharField(max_length=200)
     parentId = models.IntegerField(blank=True, null=True)
     relativeName = models.CharField(max_length=100)
+    categoria = models.IntegerField(default=None, choices=CAT_PRINCIPALES, blank=True, null=True)
+    tipo_tag = models.CharField(max_length=1, default=None, choices=TIPOS_TAG, blank=True, null=True)
 
     def __str__(self):
         return f"{self.name}, id= {self.id} "

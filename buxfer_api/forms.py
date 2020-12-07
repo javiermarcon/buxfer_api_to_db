@@ -11,3 +11,9 @@ class AccountForm(forms.ModelForm):
 
 AccountFormSet = modelformset_factory(Account, form=AccountForm, extra=0, can_delete=False)
 
+class TagForm(forms.ModelForm):
+    class Meta:
+        model = Tag
+        exclude = ()
+
+TagFormSet = modelformset_factory(Tag, form=AccountForm, extra=0, can_delete=False)
