@@ -35,14 +35,14 @@ class TransactionSerializer(serializers.ModelSerializer):
     #depth=1
 
     def to_internal_value(self, data):
-        #import pdb;pdb.set_trace()
+        # import pdb;pdb.set_trace()
         if data['tagNames']:
             tags_qs = Q()
             for tag in data['tagNames']:
                 tags_qs = tags_qs | Q(name=tag)
             tag_objs = Tag.objects.filter(tags_qs)
 
-            #import pdb;pdb.set_trace()
+            # import pdb;pdb.set_trace()
             data['tagNames'] = tag_objs # [x.id for x in tag_objs]
 
         if 'fromAccount' in data and data['fromAccount']:

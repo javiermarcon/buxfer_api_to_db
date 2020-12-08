@@ -12,9 +12,9 @@ class ProjectBaseModel(models.Model):
         abstract = True
 
 DISCRECIONALIDADES = {
-        ('F', 'F'), # Fijo
-        ('V', 'V'), # Variable
-        ('D', 'D'), # Discrecional
+        ('F', 'Fijo'), # Fijo
+        ('V', 'Variable'), # Variable
+        ('D', 'Discrecional'), # Discrecional
     }
 
 TIPOS_CAT = {
@@ -93,7 +93,7 @@ class Account(ProjectBaseModel):
         ordering = ['bank', 'name']
 
     def __str__(self):
-        return f"{self.name}, id= {self.id}, currency= {self.currency} "
+        return f"{self.name}, currency= {self.currency} "
 
 class Tag(ProjectBaseModel):
     id = models.IntegerField(primary_key=True)
@@ -104,11 +104,14 @@ class Tag(ProjectBaseModel):
     tipo_tag = models.CharField(max_length=1, default=None, choices=TIPOS_TAG, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.name}, id= {self.id} "
+        return f"{self.name}"
 
 class TransactionType(ProjectBaseModel):
     id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return f"{self.name}"
 
 class Transaction(ProjectBaseModel):
     id = models.IntegerField(primary_key=True)

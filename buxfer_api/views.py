@@ -8,7 +8,7 @@ from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
 from .models import Account, Tag, Transaction
-from .forms import AccountFormSet, TagFormSet
+from .forms import AccountFormSet, TagFormSet, TransactionFormSet
 import pprint
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
@@ -120,14 +120,14 @@ def data_import(request, action, modelClass, serializerClass, formSetClass=None)
             else:
                 formset = None
     else:
-        data = {'status': ''}
+        data = {'status': 'No Changes.'}
         if formSetClass:
             formset = formSetClass(request.POST, request.FILES)
             # import pdb; pdb.set_trace()
             if formset.is_valid():
                 # do something with the formset.cleaned_data
                 for form in formset:
-                    if form.is_valid():
+                    if form.is_valid() and form.changed_data:
                         try:
                             #if form.cleaned_data.get('DELETE') and form.instance.pk:
                             #    form.instance.delete()
@@ -164,4 +164,5 @@ def transactions_import(request):
     action = 'transactions'
     serializerClass = TransactionSerializer
     model = Transaction
-    return data_import(request, action, model, serializerClass)
+    formSetClass = TransactionFormSet
+    return data_import(request, action, model, serializerClass, formSetClass)

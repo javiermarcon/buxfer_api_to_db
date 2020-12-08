@@ -17,3 +17,10 @@ class TagForm(forms.ModelForm):
         exclude = ()
 
 TagFormSet = modelformset_factory(Tag, form=AccountForm, extra=0, can_delete=False)
+
+class TransactionForm(forms.ModelForm):
+    class Meta:
+        model = Transaction
+        exclude = ()
+
+TransactionFormSet = modelformset_factory(Transaction, form=TransactionForm, extra=0, can_delete=False)
