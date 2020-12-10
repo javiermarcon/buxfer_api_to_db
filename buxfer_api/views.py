@@ -8,8 +8,11 @@ from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
 from .models import Account, Tag, Transaction
-from .forms import AccountFormSet, TagFormSet, TransactionFormSet
+from .forms import AccountForm, TagForm, TransactionForm
+from django.forms.models import modelformset_factory
 import pprint
+import re
+
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
 
@@ -77,10 +80,12 @@ def has_changed(record, data):
             return True
     return False
 
-def data_import(request, action, modelClass, serializerClass, formSetClass=None):
+def data_import(request, action, modelClass, serializerClass, formClass=None):
     ''' Imports data from buxfer '''
     result = []
     to_delete = None
+    formSetClass = modelformset_factory(modelClass, form=formClass, extra=0, can_delete=False)
+
     if request.method != 'POST':
         data = buxfer_api_fetch(request, action)
         if data['status'] == 'ok':
@@ -115,14 +120,26 @@ def data_import(request, action, modelClass, serializerClass, formSetClass=None)
             #to_delete = [x for x in keys if x not in serialized_keys]
             #modelClass.objects.filter(pk__in=to_delete).delete()
 
-            if formSetClass:
-                formset = formSetClass()
+            # import pdb;pdb.set_trace()
+            ids = [x.id for x in result if not isinstance(x, str)]
+            if formClass and ids:
+                queryset = modelClass.objects.filter(id__in=ids)
+                formset = formSetClass(queryset = queryset)
+                qData = [[x, y] for x,y in zip(list(queryset), list(formset))]
             else:
                 formset = None
+                qData = None
     else:
         data = {'status': 'No Changes.'}
-        if formSetClass:
+        if formClass:
+            # regex_list=['the', 'an?']
+            # regex_list_compiled=[re.compile("^"+i+"$") for i in regex_list]
+            # extractddicti= {k:v for k,v in dicti.items() if any (re.match(regex,k) for regex in regex_list_compiled)}
+            pattern = 'form-[0-9]+-id'
+            ids = [value for key, value in request.POST.items() if re.search(pattern, key)]
+            queryset = modelClass.objects.filter(id__in=ids)
             formset = formSetClass(request.POST, request.FILES)
+            qData = zip(list(queryset), list(formset))
             # import pdb; pdb.set_trace()
             if formset.is_valid():
                 # do something with the formset.cleaned_data
@@ -137,16 +154,17 @@ def data_import(request, action, modelClass, serializerClass, formSetClass=None)
                         except DatabaseError as e:
                             data['status'] = "Error: {}".format(e)
 
-
+    qFieldNames = modelClass().get_fieldNames()
     return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action,
-                                                             'deleted': to_delete, 'formset': formset})
+                                                             'deleted': to_delete, 'qdata': qData, 'qFieldNames': qFieldNames,
+                                                             'formset': formset})
 
 def accounts_import(request):
     ''' Imports the accounts'''
     action = 'accounts'
     serializerClass = AccountSerializer
     model = Account
-    formSetClass = AccountFormSet
+    formSetClass = AccountForm
     return data_import(request, action, model, serializerClass, formSetClass)
 
 def tags_import(request):
@@ -154,7 +172,7 @@ def tags_import(request):
     action = 'tags'
     serializerClass = TagSerializer
     model = Tag
-    formSetClass = TagFormSet
+    formSetClass = TagForm
     return data_import(request, action, model, serializerClass, formSetClass)
 
 def transactions_import(request):
@@ -164,5 +182,5 @@ def transactions_import(request):
     action = 'transactions'
     serializerClass = TransactionSerializer
     model = Transaction
-    formSetClass = TransactionFormSet
+    formSetClass = TransactionForm
     return data_import(request, action, model, serializerClass, formSetClass)

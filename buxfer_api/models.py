@@ -11,6 +11,15 @@ class ProjectBaseModel(models.Model):
     class Meta:
         abstract = True
 
+    def get_fields(self):
+        return [(field.name, field.value_to_string(self)) for field in self._meta.fields]
+
+    def get_fieldValues(self):
+        return [field.value_to_string(self) for field in self._meta.fields]
+
+    def get_fieldNames(self):
+        return [field.name for field in self._meta.fields]
+
 DISCRECIONALIDADES = {
         ('F', 'Fijo'), # Fijo
         ('V', 'Variable'), # Variable

@@ -5,18 +5,27 @@
     <title>{{ "action"|title }}</title>
 </head>
 <body>
+
+{# For debug: <textarea onclick="this.focus();this.select()" style="width: 100%;"> {% filter force_escape %} {% debug %} {% endfilter %}</textarea> #}
+
 {{ Accounts }} synced.
 Status: {{ status }}
 data: {{ data }}
 deleted: {{ deleted }}
-{% if formset %}
+{% if qdata %}
 <form method="post" action="">
     {% csrf_token %}
     {{ formset.non_field_errors }}
     {{ formset.management_form }}
     <table>
-        {% for form in formset %}
+        {% for field in qFieldNames %}
+                <td>{{ field }}</td>
+            {% endfor %}
+        {% for qs, form in qdata %}
             <tr>
+            {% for value in qs.get_fieldValues %}
+                <td>{{ value }}</td>
+            {% endfor %}
             {% for field in form %}
                 <td>
                     {{ field.errors }}
