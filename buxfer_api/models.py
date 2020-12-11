@@ -111,6 +111,7 @@ class Tag(ProjectBaseModel):
     relativeName = models.CharField(max_length=100)
     categoria = models.IntegerField(default=None, choices=CAT_PRINCIPALES, blank=True, null=True)
     tipo_tag = models.CharField(max_length=1, default=None, choices=TIPOS_TAG, blank=True, null=True)
+    discrecionalidad = models.CharField(max_length=1, default=None, choices=DISCRECIONALIDADES, blank=True, null=True)
 
     def __str__(self):
         return f"{self.name}"

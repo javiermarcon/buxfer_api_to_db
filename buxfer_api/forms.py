@@ -12,7 +12,7 @@ class AccountForm(forms.ModelForm):
 class TagForm(forms.ModelForm):
     class Meta:
         model = Tag
-        fields = ['categoria', 'tipo_tag']
+        fields = ['categoria', 'tipo_tag', 'discrecionalidad']
 
 class TransactionForm(forms.ModelForm):
     class Meta:
