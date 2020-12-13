@@ -3,30 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <title>Cuadro de activos, pasivos, ingresos y gastos</title>
+
+    <style type="text/css">
+        table { border:1px solid black; width: 100%; }
+        .tablaTransacc { background-color:#eee;border-collapse:collapse; }
+        .tablaTransacc th { background-color:#000;color:white; }
+        .tablaTransacc td, .tablaTransacc th { padding:5px;border:1px solid #000; }
+
+    </style>
+
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-<script>
-$(document).ready(function(){
-    {% for item in data %}
-        {% for categoria, tags in item.1.data.items %}
-            {% for tag, _ in tags.data.items %}
-                $(".mostrar_{{ tag|slugify }}").click(function(){
-                    $(".{{ tag|slugify }}").toggle();
-                });
+    <script>
+    $(document).ready(function(){
+        {% for item in data %}
+            {% for categoria, tags in item.1.data.items %}
+                {% for tag, _ in tags.data.items %}
+                    $(".mostrar_{{ tag|slugify }}").click(function(){
+                        $(".{{ tag|slugify }}").toggle();
+                    });
+                {% endfor %}
             {% endfor %}
         {% endfor %}
-    {% endfor %}
-});
-</script>
+    });
+    </script>
 </head>
 <body>
 Total General: {{ total|floatformat:2 }}
 <br />
 <br />
     {% for item in data %}
-        <table border="1">
+        <table>
         <tr>
             <td style="background-color:LawnGreen" >
-                <table width="99%">
+                <table>
                     <tr>
                         <td align="left">
                             {{ item.0 }}s
@@ -41,7 +50,7 @@ Total General: {{ total|floatformat:2 }}
         {% for categoria, tags in item.1.data.items %}
             <tr>
                 <td style="background-color:yellow">
-                    <table width="99%">
+                    <table>
                         <tr>
                             <td align="left">
                                 {{ categoria }}
@@ -56,7 +65,7 @@ Total General: {{ total|floatformat:2 }}
             {% for tag, transacciones in tags.data.items %}
                 <tr>
                     <td>
-                        <table width="99%">
+                        <table>
                     <tr>
                         <td>
                         {{ tag }}
@@ -81,17 +90,45 @@ Total General: {{ total|floatformat:2 }}
                 </tr>
                 <tr>
                     <td>
-                        <table class="{{ tag|slugify }}">
+                        <table class="{{ tag|slugify }} tablaTransacc">
+                            <tr>
+                                <th>
+                                    Fecha
+                                </th>
+                                <th>
+                                    Descripci&oacute;n
+                                </th>
+                                <th>
+                                    Importe
+                                </th>
+                                <th>
+                                    Cuenta
+                                </th>
+                                <th>
+                                    Tipo
+                                </th>
+                            </tr>
                             {% for transaccion in transacciones.data %}
                                 <tr>
                                     <td>
-                                        {{ transaccion }}
+                                        {{ transaccion.normalizedDate|date:"d/M/Y" }}
                                     </td>
-                                </tr>
+                                    <td>
+                                        {{ transaccion.description }}
+                                    </td>
+                                    <td>
+                                        {{ transaccion.amount }}
+                                    </td>
+                                    <td>
+                                        {{ transaccion.accountId }}
+                                    </td>
+                                    <td>
+                                        {{ transaccion.transactionType }}
+                                    </td>
                             {% empty %}
                                 <tr>
                                     <td>
-                                        <li>-</li>
+                                        -
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -101,7 +138,7 @@ Total General: {{ total|floatformat:2 }}
             {% empty %}
                 <tr>
                     <td>
-                        <li>-</li>
+                        -
                     </td>
                 </tr>
             {% endfor %}
@@ -110,7 +147,7 @@ Total General: {{ total|floatformat:2 }}
     {% empty %}
         <tr>
             <td>
-                <li>-</li>
+                -
             </td>
         </tr>
     {% endfor %}
@@ -121,7 +158,7 @@ Total General: {{ total|floatformat:2 }}
     {% empty %}
         <tr>
             <td>
-                <li>-</li>
+                -
             </td>
         </tr>
     {% endfor %}

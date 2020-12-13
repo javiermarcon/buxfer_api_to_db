@@ -102,7 +102,7 @@ class Account(ProjectBaseModel):
         ordering = ['bank', 'name']
 
     def __str__(self):
-        return f"{self.name}, currency= {self.currency} "
+        return f"{self.name} ({self.currency})"
 
 class Tag(ProjectBaseModel):
     id = models.IntegerField(primary_key=True)
