@@ -7,7 +7,7 @@ from django.shortcuts import render,redirect
 from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
-from .models import Account, Tag, Transaction
+from .models import Account, Tag, Transaction, TIPOS_TAG, CAT_PRINCIPALES
 from .forms import AccountForm, TagForm, TransactionForm
 from django.forms.models import modelformset_factory
 import pprint
@@ -125,7 +125,7 @@ def data_import(request, action, modelClass, serializerClass, formClass=None):
             if formClass and ids:
                 queryset = modelClass.objects.filter(id__in=ids)
                 formset = formSetClass(queryset = queryset)
-                qData = [[x, y] for x,y in zip(list(queryset), list(formset))]
+                qData = zip(list(queryset), list(formset))
             else:
                 formset = None
                 qData = None
@@ -184,3 +184,60 @@ def transactions_import(request):
     model = Transaction
     formSetClass = TransactionForm
     return data_import(request, action, model, serializerClass, formSetClass)
+
+def clasificar_transacciones(anio, mes):
+    if anio and mes:
+        transactions = Transaction.objects.filter(normalizedDate__year=anio, normalizedDate__month=mes).order_by('-normalizedDate')
+    elif anio:
+        transactions = Transaction.objects.filter(normalizedDate__year=anio).order_by('-normalizedDate')
+    else:
+        transactions = Transaction.objects.order_by('-normalizedDate')
+
+    data = {}
+    total = 0
+    tipos_tag = {}
+    ord = []
+
+    for key, value in TIPOS_TAG:
+        data[value] = {}
+        data[value]['data'] = {}
+        data[value]['total'] = 0
+        tipos_tag[key] = value
+        ord.append(value)
+
+    categorias = dict([ x for x in CAT_PRINCIPALES ])
+
+    #import pdb;pdb.set_trace()
+    for transaction in transactions:
+        tags = transaction.tags.all()
+        if tags:
+            tag = tags[0]
+            if tag.tipo_tag and tag.categoria and tag.categoria in categorias:
+                tiponame = tipos_tag[tag.tipo_tag]
+                catname = categorias[tag.categoria]
+                if catname not in data[tiponame]['data']:
+                    data[tiponame]['data'][catname] = {}
+                    data[tiponame]['data'][catname]['data'] = {}
+                    data[tiponame]['data'][catname]['total'] = 0
+                if tag.name not in data[tiponame]['data'][catname]['data']:
+                    data[tiponame]['data'][catname]['data'][tag.name] = {}
+                    data[tiponame]['data'][catname]['data'][tag.name]['data'] = []
+                    data[tiponame]['data'][catname]['data'][tag.name]['total'] = 0
+                data[tiponame]['data'][catname]['data'][tag.name]['data'].append(transaction)
+                data[tiponame]['data'][catname]['data'][tag.name]['total'] += transaction.amount
+                data[tiponame]['data'][catname]['total'] += transaction.amount
+                data[tiponame]['total'] += transaction.amount
+                total += transaction.amount
+
+    # import pdb; pdb.set_trace()
+    show_data = [ (x, data[x]) for x in ord]
+    return show_data, total
+
+def cuadro_activos(request, anio=None, mes=None):
+    ''' Muestra tabla de activos, pasivos, ingresos y gastos '''
+
+    show_data, total = clasificar_transacciones(anio, mes)
+    #pprint.pprint(show_data)
+
+    return render(request, "buxfer_api/cuadro_activos.html", {'data': show_data, 'total':total})
+

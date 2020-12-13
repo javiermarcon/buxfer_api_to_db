@@ -83,10 +83,10 @@ TIPOS_PAGO = {
 }
 
 TIPOS_TAG = {
-    ('A', 'Activo'),
-    ('P', 'Pasivo'),
     ('I', 'Ingreso'),
     ('G', 'Gasto'),
+    ('A', 'Activo'),
+    ('P', 'Pasivo'),
 }
 
 class Account(ProjectBaseModel):

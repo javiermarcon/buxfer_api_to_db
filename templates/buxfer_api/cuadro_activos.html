@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cuadro de activos, pasivos, ingresos y gastos</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+$(document).ready(function(){
+    {% for item in data %}
+        {% for categoria, tags in item.1.data.items %}
+            {% for tag, _ in tags.data.items %}
+                $(".mostrar_{{ tag|slugify }}").click(function(){
+                    $(".{{ tag|slugify }}").toggle();
+                });
+            {% endfor %}
+        {% endfor %}
+    {% endfor %}
+});
+</script>
+</head>
+<body>
+Total General: {{ total|floatformat:2 }}
+<br />
+<br />
+    {% for item in data %}
+        <table border="1">
+        <tr>
+            <td style="background-color:LawnGreen" >
+                <table width="99%">
+                    <tr>
+                        <td align="left">
+                            {{ item.0 }}s
+                        </td>
+                        <td align="right">
+                            total: {{ item.1.total|floatformat:2 }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        {% for categoria, tags in item.1.data.items %}
+            <tr>
+                <td style="background-color:yellow">
+                    <table width="99%">
+                        <tr>
+                            <td align="left">
+                                {{ categoria }}
+                            </td>
+                            <td align="right">
+                                total: {{ tags.total|floatformat:2 }}
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {% for tag, transacciones in tags.data.items %}
+                <tr>
+                    <td>
+                        <table width="99%">
+                    <tr>
+                        <td>
+                        {{ tag }}
+                    </td>
+                    <td>
+                        total: {{ transacciones.total|floatformat:2 }}
+                    </td>
+                    <td>
+                        {{ transacciones.data|length }}
+                        {% if transacciones.data|length != 1 %}
+                        transacciones.
+                        {% else %}
+                        transacci&oacute;n.
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="mostrar_{{ tag|slugify }}">Ver / ocultar</button>
+                        </td>
+                    </tr>
+                </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table class="{{ tag|slugify }}">
+                            {% for transaccion in transacciones.data %}
+                                <tr>
+                                    <td>
+                                        {{ transaccion }}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td>
+                                        <li>-</li>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td>
+                        <li>-</li>
+                    </td>
+                </tr>
+            {% endfor %}
+        </td>
+    </tr>
+    {% empty %}
+        <tr>
+            <td>
+                <li>-</li>
+            </td>
+        </tr>
+    {% endfor %}
+            </td>
+        </tr>
+    </table>
+    <br />
+    {% empty %}
+        <tr>
+            <td>
+                <li>-</li>
+            </td>
+        </tr>
+    {% endfor %}
+
+{# For debug: <textarea onclick="this.focus();this.select()" style="width: 100%;" rows="20"> {% filter force_escape %} {% debug %} {% endfilter %}</textarea> #}
+
+</body>
+</html>
