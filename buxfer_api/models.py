@@ -5,8 +5,8 @@ from django.db import models
 class ProjectBaseModel(models.Model):
     """Base abstract model for all models used throughout the project."""
     ## Basic time tracking for all models ##
-    time_created = models.DateTimeField("created", auto_now_add=True, db_index=True)
-    time_modified = models.DateTimeField("modified", auto_now=True, db_index=True)
+    time_created = models.DateTimeField("created", auto_now_add=True, db_index=True, blank=True, null=True)
+    time_modified = models.DateTimeField("modified", auto_now=True, db_index=True, blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -129,7 +129,7 @@ class Transaction(ProjectBaseModel):
     #date = models.DateTimeField('Last Sync', blank=True, null=True)
     normalizedDate  = models.DateField('Last Sync', blank=True, null=True)
     #type: "transfer",
-    transactionType = models.ForeignKey(TransactionType, on_delete=models.CASCADE, related_name='transactions')
+    transactionType = models.ForeignKey(TransactionType, on_delete=models.CASCADE, related_name='transactions', blank=True, null=True)
     #rawTransactionType: 6,
     amount = models.FloatField()
     expenseAmount = models.FloatField()

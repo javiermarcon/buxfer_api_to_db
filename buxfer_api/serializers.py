@@ -45,13 +45,14 @@ class TransactionSerializer(serializers.ModelSerializer):
             # import pdb;pdb.set_trace()
             data['tagNames'] = tag_objs # [x.id for x in tag_objs]
 
-        if 'fromAccount' in data and data['fromAccount']:
-            data['fromAccount'] = data['fromAccount']['id']
-        if 'toAccount' in data and data['toAccount']:
-            data['toAccount'] = data['toAccount']['id']
+        if 'fromAccount' in data and data['fromAccount'] and isinstance(data['fromAccount'], dict):
+                data['fromAccount'] = data['fromAccount']['id']
+        if 'toAccount' in data and data['toAccount'] and isinstance(data['toAccount'], dict):
+                data['toAccount'] = data['toAccount']['id']
         transaction_type = TransactionType.objects.filter(name=data['transactionType'])
         if not transaction_type:
             transaction_type = TransactionType(id=data['rawTransactionType'], name=data['transactionType'])
+            #print(data)
             transaction_type.save()
         else:
             transaction_type = transaction_type[0]
@@ -76,7 +77,7 @@ class TransactionSerializer(serializers.ModelSerializer):
                   'isFutureDated', 'isPending', 'sortDate', 'fromAccount', 'toAccount')
 
     def create(self, validated_data):
-        print('create--')
+        #print('create--')
         #tags = validated_data.pop('tracks')
         #pprint.pprint(validated_data)
         #import pdb; pdb.set_trace()
@@ -90,7 +91,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         return transaction
 
     def update(self, instance, validated_data):
-        print('update--')
+        #print('update--')
         #tags = validated_data.pop('tracks')
         #pprint.pprint(validated_data)
         #import pdb; pdb.set_trace()
@@ -111,8 +112,8 @@ class TransactionSerializer(serializers.ModelSerializer):
             if tag_id not in objs_ids:
                 tt = TransactionTag(transaction_id=transaction_id, tag_id=tag_id)
                 tt.save()
-                print(('added', tag_id))
+                #print(('added', tag_id))
         to_delete = [x for x in objs_ids if x not in tags]
-        print(('deleting', transaction_id, to_delete))
+        #print(('deleting', transaction_id, to_delete))
         TransactionTag.objects.filter(tag_id__in=to_delete, transaction_id=transaction_id).delete()
-        print(('deleted', to_delete))
+        #print(('deleted', to_delete))

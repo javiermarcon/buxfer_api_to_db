@@ -12,6 +12,7 @@ from .forms import AccountForm, TagForm, TransactionForm
 from django.forms.models import modelformset_factory
 import pprint
 import re
+import math
 
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
@@ -46,7 +47,7 @@ def get_err_msg(response):
     return "({}) {} {}".format(response.status_code, err_type, err_msg)
 
 
-def buxfer_api_fetch(request, resource):
+def buxfer_api_fetch(request, resource, page=None):
     '''
     Fetches a resource from the buxfer api
     :param request: django request object
@@ -60,6 +61,8 @@ def buxfer_api_fetch(request, resource):
             return {'data': None, 'status': 'Buxfer Login Error: {}'.format(status)}
         url = "%s/%s?token=%s" % (settings.BUXFER_CONN['url'],
                                   resource, token)
+        if page:
+            url = '{}&page={}'.format(url, page)
         response = requests.get(url, timeout=10)
         print(url)
         if response.status_code == 200:
@@ -80,6 +83,35 @@ def has_changed(record, data):
             return True
     return False
 
+def save_serializer(actionResponseData, keys, queryset, serializerClass):
+    result = []
+    serialized_keys = []
+    for acc in actionResponseData:
+        serializer = None
+        #pprint.pprint(acc)
+        # si uso many=True en el serializer, graba solo algunos
+        if acc['id'] in keys:
+            db_rec = queryset[acc['id']]
+            if has_changed(db_rec, acc):
+                serializer = serializerClass(db_rec, data=acc)
+            else:
+                result.append('{} not changed'.format(acc['id']))
+        else:
+            serializer = serializerClass(data=acc)
+
+        if serializer:
+            if serializer.is_valid():
+                serialized_keys.append(acc['id'])
+                embed = serializer.save()
+                result.append(embed)
+            else:
+                result.append(serializer.errors)
+    # delete the ones that are not in buxfer anymore
+    # to_delete = [x for x in keys if x not in serialized_keys]
+    # modelClass.objects.filter(pk__in=to_delete).delete()
+
+    return result
+
 def data_import(request, action, modelClass, serializerClass, formClass=None):
     ''' Imports data from buxfer '''
     result = []
@@ -91,37 +123,19 @@ def data_import(request, action, modelClass, serializerClass, formClass=None):
         if data['status'] == 'ok':
             queryset = dict([(x.id, x) for x in modelClass.objects.all()])
             keys = list(six.iterkeys(queryset))
-            serialized_keys = []
             #import pdb; pdb.set_trace()
+
+            result = save_serializer(data['data']['response'][action], keys, queryset, serializerClass)
+
             if action == 'transactions':
                 numTransactions = data['data']['response']['numTransactions']
                 print(numTransactions)
-            for acc in data['data']['response'][action]:
-                serializer = None
-                pprint.pprint(acc)
-                # si uso many=True en el serializer, graba solo algunos
-                if acc['id'] in keys:
-                    db_rec = queryset[acc['id']]
-                    if has_changed(db_rec, acc):
-                        serializer = serializerClass(db_rec, data=acc)
-                    else:
-                        result.append('{} not changed'.format(acc['id']))
-                else:
-                    serializer = serializerClass(data=acc)
-
-                if serializer:
-                    if serializer.is_valid():
-                        serialized_keys.append(acc['id'])
-                        embed = serializer.save()
-                        result.append(embed)
-                    else:
-                        result.append(serializer.errors)
-            # delete the ones that are not in buxfer anymore
-            #to_delete = [x for x in keys if x not in serialized_keys]
-            #modelClass.objects.filter(pk__in=to_delete).delete()
-
+                for page in range(2, math.ceil(int(numTransactions) / 25) + 1):
+                    data = buxfer_api_fetch(request, action, page)
+                    result += save_serializer(data['data']['response'][action], keys, queryset, serializerClass)
+            print(result)
             # import pdb;pdb.set_trace()
-            ids = [x.id for x in result if not isinstance(x, str)]
+            ids = [x.id for x in result if hasattr(x, 'id')] # not isinstance(x, str)]
             if formClass and ids:
                 queryset = modelClass.objects.filter(id__in=ids)
                 formset = formSetClass(queryset = queryset)
@@ -196,14 +210,12 @@ def clasificar_transacciones(anio, mes):
     data = {}
     total = 0
     tipos_tag = {}
-    ord = []
 
     for key, value in TIPOS_TAG:
         data[value] = {}
         data[value]['data'] = {}
         data[value]['total'] = 0
         tipos_tag[key] = value
-        ord.append(value)
 
     categorias = dict([ x for x in CAT_PRINCIPALES ])
 
@@ -230,7 +242,8 @@ def clasificar_transacciones(anio, mes):
                 total += transaction.amount
 
     # import pdb; pdb.set_trace()
-    show_data = [ (x, data[x]) for x in ord]
+    show_data = [ (x, data[x]) for x in ['Ingreso', 'Gasto', 'Activo', 'Pasivo']]
+
     return show_data, total
 
 def cuadro_activos(request, anio=None, mes=None):
