@@ -82,12 +82,15 @@ TIPOS_PAGO = {
     ('C', 'Cheque'), # Cheque
 }
 
-TIPOS_TAG = {
-    ('I', 'Ingreso'),
+TIPOS_TAG_ORD = [
+    ('IP', 'Ingreso Pasivo'),
+    ('IA', 'Ingreso Activo'),
+    ('IC', 'Ingreso de Cartera'),
     ('G', 'Gasto'),
     ('A', 'Activo'),
     ('P', 'Pasivo'),
-}
+]
+TIPOS_TAG = set(TIPOS_TAG_ORD)
 
 class Account(ProjectBaseModel):
     id = models.IntegerField(primary_key=True)
@@ -110,7 +113,7 @@ class Tag(ProjectBaseModel):
     parentId = models.IntegerField(blank=True, null=True)
     relativeName = models.CharField(max_length=100)
     categoria = models.IntegerField(default=None, choices=CAT_PRINCIPALES, blank=True, null=True)
-    tipo_tag = models.CharField(max_length=1, default=None, choices=TIPOS_TAG, blank=True, null=True)
+    tipo_tag = models.CharField(max_length=2, default=None, choices=TIPOS_TAG, blank=True, null=True)
     discrecionalidad = models.CharField(max_length=1, default=None, choices=DISCRECIONALIDADES, blank=True, null=True)
 
     def __str__(self):
@@ -155,4 +158,3 @@ class TransactionTag(models.Model):
     id = models.IntegerField(primary_key=True)
     transaction_id = models.ForeignKey(Transaction, on_delete=models.CASCADE, blank=True, null=True)
     tag_id = models.ForeignKey(Tag, on_delete=models.CASCADE, blank=True, null=True)
-

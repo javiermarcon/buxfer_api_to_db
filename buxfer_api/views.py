@@ -7,13 +7,16 @@ from django.shortcuts import render,redirect
 from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
-from .models import Account, Tag, Transaction, TIPOS_TAG, CAT_PRINCIPALES
+from .models import Account, Tag, Transaction, TIPOS_TAG_ORD, CAT_PRINCIPALES
 from .forms import AccountForm, TagForm, TransactionForm
 from django.forms.models import modelformset_factory
 import pprint
 import re
 import math
-
+#from openpyxl import Workbook
+from openpyxl import load_workbook
+from django.db.models import Q
+import pdb
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
 
@@ -76,12 +79,14 @@ def buxfer_api_fetch(request, resource, page=None):
     err_msg = get_err_msg(response)
     return {'data': None, 'status': 'Error: {}'.format(err_msg) }
 
+
 def has_changed(record, data):
     for key in data:
         #print(getattr(record, key, None))
         if data[key] != getattr(record, key, None):
             return True
     return False
+
 
 def save_serializer(actionResponseData, keys, queryset, serializerClass):
     result = []
@@ -173,6 +178,7 @@ def data_import(request, action, modelClass, serializerClass, formClass=None):
                                                              'deleted': to_delete, 'qdata': qData, 'qFieldNames': qFieldNames,
                                                              'formset': formset})
 
+
 def accounts_import(request):
     ''' Imports the accounts'''
     action = 'accounts'
@@ -181,6 +187,7 @@ def accounts_import(request):
     formSetClass = AccountForm
     return data_import(request, action, model, serializerClass, formSetClass)
 
+
 def tags_import(request):
     ''' Imports the accounts'''
     action = 'tags'
@@ -188,6 +195,7 @@ def tags_import(request):
     model = Tag
     formSetClass = TagForm
     return data_import(request, action, model, serializerClass, formSetClass)
+
 
 def transactions_import(request):
     ''' Imports the accounts'''
@@ -199,7 +207,13 @@ def transactions_import(request):
     formSetClass = TransactionForm
     return data_import(request, action, model, serializerClass, formSetClass)
 
-def clasificar_transacciones(anio, mes):
+
+def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
+    '''Clasifica las transacciones para mostrar con totales'''
+    data = {}
+    total = 0
+    tipos_tag = {}
+
     if anio and mes:
         transactions = Transaction.objects.filter(normalizedDate__year=anio, normalizedDate__month=mes).order_by('-normalizedDate')
     elif anio:
@@ -207,11 +221,7 @@ def clasificar_transacciones(anio, mes):
     else:
         transactions = Transaction.objects.order_by('-normalizedDate')
 
-    data = {}
-    total = 0
-    tipos_tag = {}
-
-    for key, value in TIPOS_TAG:
+    for (key, value) in TIPOS_TAG_ORD:
         data[value] = {}
         data[value]['data'] = {}
         data[value]['total'] = 0
@@ -236,15 +246,27 @@ def clasificar_transacciones(anio, mes):
                     data[tiponame]['data'][catname]['data'][tag.name]['data'] = []
                     data[tiponame]['data'][catname]['data'][tag.name]['total'] = 0
                 data[tiponame]['data'][catname]['data'][tag.name]['data'].append(transaction)
+                if addDiscrecionalidad:
+                    if 'discrecionalidad' not in data[tiponame]['data'][catname]['data'][tag.name]:
+                        data[tiponame]['data'][catname]['data'][tag.name]['discrecionalidad'] = {}
+                    dct = {}
+                    if transaction.discrecionalidad:
+                        dct['discrecionalidad'] = transaction.discrecionalidad
+                    else:
+                        dct['discrecionalidad'] = tag.discrecionalidad
+                    #dct['tipo_tag'] = tag.tipo_tag
+                    dct['tipo_pago'] = transaction.accountId.tipo_pago
+                    data[tiponame]['data'][catname]['data'][tag.name]['discrecionalidad'][transaction.id] = dct
                 data[tiponame]['data'][catname]['data'][tag.name]['total'] += transaction.amount
                 data[tiponame]['data'][catname]['total'] += transaction.amount
                 data[tiponame]['total'] += transaction.amount
                 total += transaction.amount
 
     # import pdb; pdb.set_trace()
-    show_data = [ (x, data[x]) for x in ['Ingreso', 'Gasto', 'Activo', 'Pasivo']]
+    show_data = [ (x[1], data[x[1]]) for x in TIPOS_TAG_ORD]
 
     return show_data, total
+
 
 def cuadro_activos(request, anio=None, mes=None):
     ''' Muestra tabla de activos, pasivos, ingresos y gastos '''
@@ -254,3 +276,60 @@ def cuadro_activos(request, anio=None, mes=None):
 
     return render(request, "buxfer_api/cuadro_activos.html", {'data': show_data, 'total':total})
 
+
+def planilla_estado_financiero(request, anio=None, mes=None):
+    '''Graba la planilla de estado financiero'''
+
+    data, total = clasificar_transacciones(anio, mes, True)
+
+    columnas_meses = {1:'D', 2:'E', 3:'F', 4:'G', 5:'H', 6:'I', 7:'J', 8:'K', 9:'L', 10:'M', 11:'N', 12:'O'}
+    filas_categorias = {'HOGAR Y VIVIENDA': (39, 2),
+        'AUTOMOVIL Y TRANSPORTE': (40, 3),
+        'ALIMENTOS': (41, 4),
+        'ROPA': (42, 5),
+        'CUIDADO PERSONAL': (43, 6),
+        'CUIDADO DE LA SALUD': (44, 7),
+        'ENTRETENIMIENTO': (45, 8),
+        'REGALOS': (46, 9),
+        'EDUCACION': (47, 10),
+        'VACACIONES': (48, 11),
+        'GASTOS DE NEGOCIOS': (49, 12),
+        'CUIDADO Y DEPENDENCIAS': (50, 13),
+        'INVERSIONES Y AHORROS': (51, 14),
+        'SEGUROS': (52, 15),
+        'ESPIRITUAL': (53, 16),
+        'DEUDAS REPAGADAS': (54, 17),
+        'SERVICIOS': (55, 18),
+        'IMPUESTOS': (56, 19),
+        'LECCIONES APRENDIDAS': (57, 20),
+        'HONORARIOS PAGADOS': (58, 21)
+        }
+    workbook = load_workbook(filename="estado_financiero_plantilla.xlsx")
+    sheetBalance = workbook.get_sheet_by_name('Balance y Flujo')
+    sheetGastos = workbook.get_sheet_by_name('Gastos Detalle')
+    #print(workbook.sheetnames) # ['Balance y Flujo', 'Gastos Detalle']
+    totales = {}
+    transactionLine = 25
+    #pdb.set_trace()
+    for item in data:
+        for categoria, tags in item[1]['data'].items():
+            for tag, transacciones in tags['data'].items():
+                for transaccion in transacciones['data']:
+                    sheetGastos["A{}".format(transactionLine)] = transaccion.normalizedDate # fecha
+                    sheetGastos["B{}".format(transactionLine)] = transaccion.description  # descripcion
+                    sheetGastos["C{}".format(transactionLine)] = tags['data'][tag]['discrecionalidad'][transaccion.id]['discrecionalidad']  # F/V/D
+                    sheetGastos["D{}".format(transactionLine)] = tags['data'][tag]['discrecionalidad'][transaccion.id]['tipo_pago']  # $/T/C
+                    sheetGastos["E{}".format(transactionLine)] = categoria  # cuenta
+                    sheetGastos["F{}".format(transactionLine)] = tag  # subcuenta
+                    sheetGastos["G{}".format(transactionLine)] = transaccion.amount  # monto
+
+                    transactionLine += 1
+            #pdb.set_trace()
+
+            sheetBalance["{}{}".format('C', filas_categorias[categoria][0])] = tags['total']
+            sheetGastos["{}{}".format(columnas_meses[mes], filas_categorias[categoria][1])] = tags['total']
+
+
+    workbook.save(filename="estado_financiero_{}_{}.xlsx".format(anio, mes))
+
+    return render(request, "buxfer_api/planilla_estado_financiero.html")
