@@ -146,6 +146,7 @@ class Transaction(ProjectBaseModel):
     fromAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactionsFrom', blank=True, null=True)
     toAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactionsTo', blank=True, null=True)
     discrecionalidad = models.CharField(max_length=1 ,default=None,choices=DISCRECIONALIDADES, blank=True, null=True)
+    cantPesos = models.FloatField(blank=True, null=True)
 
     class Meta:
         ordering = ['-normalizedDate', 'description']
@@ -158,3 +159,31 @@ class TransactionTag(models.Model):
     id = models.IntegerField(primary_key=True)
     transaction_id = models.ForeignKey(Transaction, on_delete=models.CASCADE, blank=True, null=True)
     tag_id = models.ForeignKey(Tag, on_delete=models.CASCADE, blank=True, null=True)
+
+class DollarPrice(models.Model):
+    purchase_date = models.DateField()
+    buy = models.FloatField()
+    sell = models.FloatField()
+
+    # this method is on the model's manager
+    def get_closest_to(self, target):
+        # closest_greater_qs = self.filter(dt__gt=target).order_by('dt')
+        closest_less_qs = self.filter(dt__lt=target).order_by('-dt')
+
+        try:
+            #try:
+            #    closest_greater = closest_greater_qs[0]
+            #except IndexError:
+            #    return closest_less_qs[0]
+
+            # try:
+            closest_less = closest_less_qs[0]
+            # except IndexError:
+            #     return closest_greater_qs[0]
+        except IndexError:
+            raise self.model.DoesNotExist("There is no closest dollar price.")
+
+        # if closest_greater.dt - target > target - closest_less.dt:
+        return closest_less
+        #else:
+        #    return closest_greater

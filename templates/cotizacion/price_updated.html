@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Actualizacion de cotización</title>
+
+    <style type="text/css">
+        table { border:1px solid black; }
+        td, th { padding:5px;border:1px solid #000; }
+    </style>
+</head>
+<body>
+
+{# For debug: <textarea onclick="this.focus();this.select()" style="width: 100%;"> {% filter force_escape %} {% debug %} {% endfilter %}</textarea> #}
+
+Cotización catualizada.
+Datos agregados:
+
+{% if updated %}
+    <table>
+        <tr>
+            <td>Fecha</td>
+            <td>Compra</td>
+            <td>Venta</td>
+        </tr>
+        {% for line in updated %}
+            <tr>
+                <td>{{ line.0 }}</td>
+                <td>{{ line.1 }}</td>
+                <td>{{ line.2 }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endif %}
+</body>
+</html>

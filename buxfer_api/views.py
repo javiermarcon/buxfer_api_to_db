@@ -1,5 +1,6 @@
 #from django.shortcuts import render
 import requests
+import urllib.parse
 import time
 import six
 from django.db import DatabaseError
@@ -7,7 +8,7 @@ from django.shortcuts import render,redirect
 from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
-from .models import Account, Tag, Transaction, TIPOS_TAG_ORD, CAT_PRINCIPALES
+from .models import Account, Tag, Transaction, DollarPrice, TIPOS_TAG_ORD, CAT_PRINCIPALES
 from .forms import AccountForm, TagForm, TransactionForm
 from django.forms.models import modelformset_factory
 import pprint
@@ -16,7 +17,9 @@ import math
 #from openpyxl import Workbook
 from openpyxl import load_workbook
 from django.db.models import Q
-import pdb
+import datetime
+from dateutil.relativedelta import relativedelta
+#import pdb
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
 
@@ -333,3 +336,63 @@ def planilla_estado_financiero(request, anio=None, mes=None):
     workbook.save(filename="estado_financiero_{}_{}.xlsx".format(anio, mes))
 
     return render(request, "buxfer_api/planilla_estado_financiero.html")
+
+def get_api_call(ids, **kwargs):
+    API_BASE_URL = "https://apis.datos.gob.ar/series/api/"
+    kwargs["ids"] = ",".join(ids)
+    return "{}{}?{}".format(API_BASE_URL, "series", urllib.parse.urlencode(kwargs))
+
+def fetch_precio_dolar(fecha):
+    '''Se trae el precio del dolar oficial mostrador banco nacion de las 15 hs'''
+    # fecha: "2017-01-01"
+
+    #           fecha       compra  venta
+    # 'data': [['2017-04-03', 15.2, 15.6],
+    #          ['2017-04-04', 15.2, 15.6],
+    #
+    # https://datos.gob.ar/series/api/series/?ids=tc_usd_bna_mc15
+    # Tipo de cambio ARS/USD. BNA. Mostrador. Compra. 15hs. (tc_usd_bna_mc15)
+    #
+    # https://datos.gob.ar/series/api/series/?ids=tc_usd_bna_mv15
+    # Tipo de cambio ARS/USD. BNA. Mostrador. Venta. 15hs. (tc_usd_bna_mv15)
+    #
+
+    api_call = get_api_call(["tc_usd_bna_mc15", "tc_usd_bna_mv15"], start_date=fecha)
+    result = requests.get(api_call).json()
+    if 'data' in result:
+        return result['data']
+    return []
+
+def precios_dolar(request, modo, anio=0, mes=0, dia=0):
+    '''Obtener los precios del dolar oficial'''
+    updated = []
+    formato_fecha = '%Y-%m-%d'
+    hoy = datetime.date.today().strftime(formato_fecha)
+    db_dates = [x.purchase_date.strftime(formato_fecha) for x in DollarPrice.objects.all()]
+
+    # modo == 'todos'
+    fecha = '2000-01-01'
+    if modo == 'actualizar' and db_dates:
+        fecha = max(db_dates)
+    elif modo == 'fecha':
+        fecha = datetime.date(anio, mes, dia).strftime(formato_fecha)
+
+    last_date = fecha
+    while fecha < hoy:
+
+        precios = fetch_precio_dolar(fecha)
+
+        if not precios:
+            break
+        last_date = precios[-1][0]
+        if last_date == fecha:
+            break
+        fecha = last_date
+
+        for linea in precios:
+            if linea[0] not in db_dates and (linea[1] or linea[2]):
+                dp = DollarPrice(purchase_date=linea[0], buy=linea[1], sell=linea[2])
+                dp.save()
+                updated.append(linea)
+
+    return render(request, "cotizacion/price_updated.html", {'updated':updated})
