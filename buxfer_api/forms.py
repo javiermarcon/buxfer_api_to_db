@@ -18,3 +18,9 @@ class TransactionForm(forms.ModelForm):
     class Meta:
         model = Transaction
         fields = ['discrecionalidad']
+
+class EditDataForm(forms.Form):
+    ''' Page and ids t show in the editing form of changed data '''
+    next_page = forms.IntegerField()
+    ids = forms.CharField(widget=forms.HiddenInput())
+    current_page = forms.IntegerField(widget=forms.HiddenInput())

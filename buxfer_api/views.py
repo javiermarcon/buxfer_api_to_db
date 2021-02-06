@@ -1,33 +1,37 @@
-#from django.shortcuts import render
+# from django.shortcuts import render
 import requests
 import urllib.parse
 import time
 import six
 from django.db import DatabaseError
-from django.shortcuts import render,redirect
+from django.shortcuts import render, redirect
 from rest_framework import viewsets
 from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
 from .models import Account, Tag, Transaction, DollarPrice, TIPOS_TAG_ORD, CAT_PRINCIPALES
-from .forms import AccountForm, TagForm, TransactionForm
+from .forms import AccountForm, TagForm, TransactionForm, EditDataForm
 from django.forms.models import modelformset_factory
 import pprint
 import re
 import math
-#from openpyxl import Workbook
+# from openpyxl import Workbook
 from openpyxl import load_workbook
 from django.db.models import Q
 import datetime
 from dateutil.relativedelta import relativedelta
-#import pdb
+
+# import pdb
 # Create your views here.
 requests.packages.urllib3.disable_warnings()
+import json
+import time
 
 
 def buxfer_login(request):
     ''' performs the login in the buxfer api and returns the token and a status text '''
     response = requests.get("%s/login?userid=%s" \
-                            "&password=%s" % (settings.BUXFER_CONN['url'], settings.BUXFER_CONN['user'], settings.BUXFER_CONN['pass']))
+                            "&password=%s" % (
+                            settings.BUXFER_CONN['url'], settings.BUXFER_CONN['user'], settings.BUXFER_CONN['pass']))
 
     if response.status_code != 200:
         return (None, get_err_msg(response))
@@ -73,19 +77,19 @@ def buxfer_api_fetch(request, resource, page=None):
         print(url)
         if response.status_code == 200:
             data = response.json()
-            return {'data': data, 'status': 'ok' }
+            return {'data': data, 'status': 'ok'}
         else:
             attempt_num += 1
             # You can probably use a logger to log the error here
             time.sleep(5)  # Wait for 5 seconds before re-trying
 
     err_msg = get_err_msg(response)
-    return {'data': None, 'status': 'Error: {}'.format(err_msg) }
+    return {'data': None, 'status': 'Error: {}'.format(err_msg)}
 
 
 def has_changed(record, data):
     for key in data:
-        #print(getattr(record, key, None))
+        # print(getattr(record, key, None))
         if data[key] != getattr(record, key, None):
             return True
     return False
@@ -96,7 +100,7 @@ def save_serializer(actionResponseData, keys, queryset, serializerClass):
     serialized_keys = []
     for acc in actionResponseData:
         serializer = None
-        #pprint.pprint(acc)
+        # pprint.pprint(acc)
         # si uso many=True en el serializer, graba solo algunos
         if acc['id'] in keys:
             db_rec = queryset[acc['id']]
@@ -120,8 +124,10 @@ def save_serializer(actionResponseData, keys, queryset, serializerClass):
 
     return result
 
+
 def data_import(request, action, modelClass, serializerClass, formClass=None):
     ''' Imports data from buxfer '''
+    form_len = 25
     result = []
     to_delete = None
     formSetClass = modelformset_factory(modelClass, form=formClass, extra=0, can_delete=False)
@@ -131,7 +137,7 @@ def data_import(request, action, modelClass, serializerClass, formClass=None):
         if data['status'] == 'ok':
             queryset = dict([(x.id, x) for x in modelClass.objects.all()])
             keys = list(six.iterkeys(queryset))
-            #import pdb; pdb.set_trace()
+            #import pdb  ; pdb.set_trace()
 
             result = save_serializer(data['data']['response'][action], keys, queryset, serializerClass)
 
@@ -140,26 +146,43 @@ def data_import(request, action, modelClass, serializerClass, formClass=None):
                 print(numTransactions)
                 for page in range(2, math.ceil(int(numTransactions) / 25) + 1):
                     data = buxfer_api_fetch(request, action, page)
-                    result += save_serializer(data['data']['response'][action], keys, queryset, serializerClass)
+                    if data['data']:
+                        result += save_serializer(data['data']['response'][action], keys, queryset, serializerClass)
+                        time.sleep(1)
             print(result)
             # import pdb;pdb.set_trace()
-            ids = [x.id for x in result if hasattr(x, 'id')] # not isinstance(x, str)]
+            ids = [x.id for x in result if hasattr(x, 'id')]  # not isinstance(x, str)]
+            pIds = ids[:form_len]
             if formClass and ids:
-                queryset = modelClass.objects.filter(id__in=ids)
-                formset = formSetClass(queryset = queryset)
+                queryset = modelClass.objects.filter(id__in=pIds)
+                formset = formSetClass(queryset=queryset)
                 qData = zip(list(queryset), list(formset))
+                editData = EditDataForm(data={'current_page': 0, 'next_page': 1, 'ids': json.dumps(ids)})
             else:
                 formset = None
                 qData = None
+                editData = None
     else:
+        errors = 0
+        # import pdb; pdb.set_trace()
         data = {'status': 'No Changes.'}
         if formClass:
             # regex_list=['the', 'an?']
             # regex_list_compiled=[re.compile("^"+i+"$") for i in regex_list]
             # extractddicti= {k:v for k,v in dicti.items() if any (re.match(regex,k) for regex in regex_list_compiled)}
-            pattern = 'form-[0-9]+-id'
-            ids = [value for key, value in request.POST.items() if re.search(pattern, key)]
-            queryset = modelClass.objects.filter(id__in=ids)
+            editData = EditDataForm(request.POST)
+            if editData.is_valid():
+                ids = json.loads(editData.cleaned_data['ids'])
+                pageNum = editData.cleaned_data['current_page']
+                nextPage = editData.cleaned_data['next_page']
+            else:
+                pattern = 'form-[0-9]+-id'
+                ids = [value for key, value in request.POST.items() if re.search(pattern, key)]
+                pageNum = 0
+                nextPage = 0
+            offset = pageNum * form_len
+            pIds = ids[offset:offset + form_len]
+            queryset = modelClass.objects.filter(id__in=pIds)
             formset = formSetClass(request.POST, request.FILES)
             qData = zip(list(queryset), list(formset))
             # import pdb; pdb.set_trace()
@@ -168,18 +191,30 @@ def data_import(request, action, modelClass, serializerClass, formClass=None):
                 for form in formset:
                     if form.is_valid() and form.changed_data:
                         try:
-                            #if form.cleaned_data.get('DELETE') and form.instance.pk:
+                            # if form.cleaned_data.get('DELETE') and form.instance.pk:
                             #    form.instance.delete()
-                            #else:
+                            # else:
                             form.save()
                             data['status'] = "Saved."
                         except DatabaseError as e:
                             data['status'] = "Error: {}".format(e)
+                            errors += 1
+            if not errors:
+                #import pdb;
+                #pdb.set_trace()
+                offset = nextPage * form_len
+                pIds = ids[offset:offset + form_len]
+                queryset = modelClass.objects.filter(id__in=pIds)
+                if queryset:
+                    formset = formSetClass(queryset=queryset)
+                    qData = zip(list(queryset), list(formset))
+                    editData = EditDataForm(data={'current_page': nextPage, 'next_page': nextPage + 1, 'ids': ids})
 
     qFieldNames = modelClass().get_fieldNames()
     return render(request, "buxfer_api/data_imported.html", {'status': data['status'], 'data': result, 'action': action,
-                                                             'deleted': to_delete, 'qdata': qData, 'qFieldNames': qFieldNames,
-                                                             'formset': formset})
+                                                             'deleted': to_delete, 'qdata': qData,
+                                                             'qFieldNames': qFieldNames,
+                                                             'formset': formset, 'editData': editData})
 
 
 def accounts_import(request):
@@ -218,7 +253,8 @@ def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
     tipos_tag = {}
 
     if anio and mes:
-        transactions = Transaction.objects.filter(normalizedDate__year=anio, normalizedDate__month=mes).order_by('-normalizedDate')
+        transactions = Transaction.objects.filter(normalizedDate__year=anio, normalizedDate__month=mes).order_by(
+            '-normalizedDate')
     elif anio:
         transactions = Transaction.objects.filter(normalizedDate__year=anio).order_by('-normalizedDate')
     else:
@@ -230,9 +266,9 @@ def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
         data[value]['total'] = 0
         tipos_tag[key] = value
 
-    categorias = dict([ x for x in CAT_PRINCIPALES ])
+    categorias = dict([x for x in CAT_PRINCIPALES])
 
-    #import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
     for transaction in transactions:
         tags = transaction.tags.all()
         if tags:
@@ -257,7 +293,7 @@ def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
                         dct['discrecionalidad'] = transaction.discrecionalidad
                     else:
                         dct['discrecionalidad'] = tag.discrecionalidad
-                    #dct['tipo_tag'] = tag.tipo_tag
+                    # dct['tipo_tag'] = tag.tipo_tag
                     dct['tipo_pago'] = transaction.accountId.tipo_pago
                     data[tiponame]['data'][catname]['data'][tag.name]['discrecionalidad'][transaction.id] = dct
                 data[tiponame]['data'][catname]['data'][tag.name]['total'] += transaction.amount
@@ -266,7 +302,7 @@ def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
                 total += transaction.amount
 
     # import pdb; pdb.set_trace()
-    show_data = [ (x[1], data[x[1]]) for x in TIPOS_TAG_ORD]
+    show_data = [(x[1], data[x[1]]) for x in TIPOS_TAG_ORD]
 
     return show_data, total
 
@@ -275,9 +311,9 @@ def cuadro_activos(request, anio=None, mes=None):
     ''' Muestra tabla de activos, pasivos, ingresos y gastos '''
 
     show_data, total = clasificar_transacciones(anio, mes)
-    #pprint.pprint(show_data)
+    # pprint.pprint(show_data)
 
-    return render(request, "buxfer_api/cuadro_activos.html", {'data': show_data, 'total':total})
+    return render(request, "buxfer_api/cuadro_activos.html", {'data': show_data, 'total': total})
 
 
 def planilla_estado_financiero(request, anio=None, mes=None):
@@ -285,62 +321,65 @@ def planilla_estado_financiero(request, anio=None, mes=None):
 
     data, total = clasificar_transacciones(anio, mes, True)
 
-    columnas_meses = {1:'D', 2:'E', 3:'F', 4:'G', 5:'H', 6:'I', 7:'J', 8:'K', 9:'L', 10:'M', 11:'N', 12:'O'}
+    columnas_meses = {1: 'D', 2: 'E', 3: 'F', 4: 'G', 5: 'H', 6: 'I', 7: 'J', 8: 'K', 9: 'L', 10: 'M', 11: 'N', 12: 'O'}
     filas_categorias = {'HOGAR Y VIVIENDA': (39, 2),
-        'AUTOMOVIL Y TRANSPORTE': (40, 3),
-        'ALIMENTOS': (41, 4),
-        'ROPA': (42, 5),
-        'CUIDADO PERSONAL': (43, 6),
-        'CUIDADO DE LA SALUD': (44, 7),
-        'ENTRETENIMIENTO': (45, 8),
-        'REGALOS': (46, 9),
-        'EDUCACION': (47, 10),
-        'VACACIONES': (48, 11),
-        'GASTOS DE NEGOCIOS': (49, 12),
-        'CUIDADO Y DEPENDENCIAS': (50, 13),
-        'INVERSIONES Y AHORROS': (51, 14),
-        'SEGUROS': (52, 15),
-        'ESPIRITUAL': (53, 16),
-        'DEUDAS REPAGADAS': (54, 17),
-        'SERVICIOS': (55, 18),
-        'IMPUESTOS': (56, 19),
-        'LECCIONES APRENDIDAS': (57, 20),
-        'HONORARIOS PAGADOS': (58, 21)
-        }
+                        'AUTOMOVIL Y TRANSPORTE': (40, 3),
+                        'ALIMENTOS': (41, 4),
+                        'ROPA': (42, 5),
+                        'CUIDADO PERSONAL': (43, 6),
+                        'CUIDADO DE LA SALUD': (44, 7),
+                        'ENTRETENIMIENTO': (45, 8),
+                        'REGALOS': (46, 9),
+                        'EDUCACION': (47, 10),
+                        'VACACIONES': (48, 11),
+                        'GASTOS DE NEGOCIOS': (49, 12),
+                        'CUIDADO Y DEPENDENCIAS': (50, 13),
+                        'INVERSIONES Y AHORROS': (51, 14),
+                        'SEGUROS': (52, 15),
+                        'ESPIRITUAL': (53, 16),
+                        'DEUDAS REPAGADAS': (54, 17),
+                        'SERVICIOS': (55, 18),
+                        'IMPUESTOS': (56, 19),
+                        'LECCIONES APRENDIDAS': (57, 20),
+                        'HONORARIOS PAGADOS': (58, 21)
+                        }
     workbook = load_workbook(filename="estado_financiero_plantilla.xlsx")
     sheetBalance = workbook.get_sheet_by_name('Balance y Flujo')
     sheetGastos = workbook.get_sheet_by_name('Gastos Detalle')
-    #print(workbook.sheetnames) # ['Balance y Flujo', 'Gastos Detalle']
+    # print(workbook.sheetnames) # ['Balance y Flujo', 'Gastos Detalle']
     totales = {}
     transactionLine = 25
-    #pdb.set_trace()
+    # pdb.set_trace()
     for item in data:
         for categoria, tags in item[1]['data'].items():
             for tag, transacciones in tags['data'].items():
                 for transaccion in transacciones['data']:
-                    sheetGastos["A{}".format(transactionLine)] = transaccion.normalizedDate # fecha
+                    sheetGastos["A{}".format(transactionLine)] = transaccion.normalizedDate  # fecha
                     sheetGastos["B{}".format(transactionLine)] = transaccion.description  # descripcion
-                    sheetGastos["C{}".format(transactionLine)] = tags['data'][tag]['discrecionalidad'][transaccion.id]['discrecionalidad']  # F/V/D
-                    sheetGastos["D{}".format(transactionLine)] = tags['data'][tag]['discrecionalidad'][transaccion.id]['tipo_pago']  # $/T/C
+                    sheetGastos["C{}".format(transactionLine)] = tags['data'][tag]['discrecionalidad'][transaccion.id][
+                        'discrecionalidad']  # F/V/D
+                    sheetGastos["D{}".format(transactionLine)] = tags['data'][tag]['discrecionalidad'][transaccion.id][
+                        'tipo_pago']  # $/T/C
                     sheetGastos["E{}".format(transactionLine)] = categoria  # cuenta
                     sheetGastos["F{}".format(transactionLine)] = tag  # subcuenta
                     sheetGastos["G{}".format(transactionLine)] = transaccion.amount  # monto
 
                     transactionLine += 1
-            #pdb.set_trace()
+            # pdb.set_trace()
 
             sheetBalance["{}{}".format('C', filas_categorias[categoria][0])] = tags['total']
             sheetGastos["{}{}".format(columnas_meses[mes], filas_categorias[categoria][1])] = tags['total']
-
 
     workbook.save(filename="estado_financiero_{}_{}.xlsx".format(anio, mes))
 
     return render(request, "buxfer_api/planilla_estado_financiero.html")
 
+
 def get_api_call(ids, **kwargs):
     API_BASE_URL = "https://apis.datos.gob.ar/series/api/"
     kwargs["ids"] = ",".join(ids)
     return "{}{}?{}".format(API_BASE_URL, "series", urllib.parse.urlencode(kwargs))
+
 
 def fetch_precio_dolar(fecha):
     '''Se trae el precio del dolar oficial mostrador banco nacion de las 15 hs'''
@@ -362,6 +401,7 @@ def fetch_precio_dolar(fecha):
     if 'data' in result:
         return result['data']
     return []
+
 
 def precios_dolar(request, modo, anio=0, mes=0, dia=0):
     '''Obtener los precios del dolar oficial'''
@@ -395,4 +435,4 @@ def precios_dolar(request, modo, anio=0, mes=0, dia=0):
                 dp.save()
                 updated.append(linea)
 
-    return render(request, "cotizacion/price_updated.html", {'updated':updated})
+    return render(request, "cotizacion/price_updated.html", {'updated': updated})
