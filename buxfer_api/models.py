@@ -164,26 +164,3 @@ class DollarPrice(models.Model):
     purchase_date = models.DateField()
     buy = models.FloatField()
     sell = models.FloatField()
-
-    # this method is on the model's manager
-    def get_closest_to(self, target):
-        # closest_greater_qs = self.filter(dt__gt=target).order_by('dt')
-        closest_less_qs = self.filter(dt__lt=target).order_by('-dt')
-
-        try:
-            #try:
-            #    closest_greater = closest_greater_qs[0]
-            #except IndexError:
-            #    return closest_less_qs[0]
-
-            # try:
-            closest_less = closest_less_qs[0]
-            # except IndexError:
-            #     return closest_greater_qs[0]
-        except IndexError:
-            raise self.model.DoesNotExist("There is no closest dollar price.")
-
-        # if closest_greater.dt - target > target - closest_less.dt:
-        return closest_less
-        #else:
-        #    return closest_greater

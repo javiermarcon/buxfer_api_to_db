@@ -3,6 +3,7 @@ from rest_framework.fields import ReadOnlyField
 from django.db.models import Q
 import pprint
 from .models import Account, Tag, TransactionType, Transaction, TransactionTag
+from .utils import transform_to_ars_account
 
 # https://stackoverflow.com/questions/17280007/retrieving-a-foreign-key-value-with-django-rest-framework-serializers
 # https://stackoverflow.com/questions/14573102/how-do-i-include-related-model-fields-using-django-rest-framework
@@ -63,6 +64,12 @@ class TransactionSerializer(serializers.ModelSerializer):
             data['transactionType'] = transaction_type.id
         except Exception as e:
             print(e)
+        if 'amount' in data:
+            if 'accountId' in data:
+                acc = data['accountId']
+            elif 'toAccount' in data:
+                acc = data['toAccount']
+            data['cantPesos'] = transform_to_ars_account(data['amount'], data['normalizedDate'], acc)
         #print(data)
         return super(TransactionSerializer, self).to_internal_value(data)
 
@@ -74,7 +81,7 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ('id', 'description', 'normalizedDate', 'transactionType', 'amount', 'expenseAmount', 'accountId', 'tagNames', 'status',
-                  'isFutureDated', 'isPending', 'sortDate', 'fromAccount', 'toAccount')
+                  'isFutureDated', 'isPending', 'sortDate', 'fromAccount', 'toAccount', 'cantPesos')
 
     def create(self, validated_data):
         #print('create--')

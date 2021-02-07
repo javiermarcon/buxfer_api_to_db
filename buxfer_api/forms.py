@@ -9,15 +9,18 @@ class AccountForm(forms.ModelForm):
         model = Account
         fields = ['tipo_pago']
 
+
 class TagForm(forms.ModelForm):
     class Meta:
         model = Tag
         fields = ['categoria', 'tipo_tag', 'discrecionalidad']
 
+
 class TransactionForm(forms.ModelForm):
     class Meta:
         model = Transaction
-        fields = ['discrecionalidad']
+        fields = ['discrecionalidad', 'cantPesos']
+
 
 class EditDataForm(forms.Form):
     ''' Page and ids t show in the editing form of changed data '''
