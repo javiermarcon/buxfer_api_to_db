@@ -128,32 +128,32 @@ class TransactionType(ProjectBaseModel):
 
 class Transaction(ProjectBaseModel):
     id = models.IntegerField(primary_key=True)
-    description = models.CharField(max_length=200)
+    description = models.CharField(max_length=200, blank=True, null=True)
     #date = models.DateTimeField('Last Sync', blank=True, null=True)
-    normalizedDate  = models.DateField('Last Sync', blank=True, null=True)
+    date  = models.DateField('Last Sync', blank=True, null=True)
     #type: "transfer",
     transactionType = models.ForeignKey(TransactionType, on_delete=models.CASCADE, related_name='transactions', blank=True, null=True)
     #rawTransactionType: 6,
-    amount = models.FloatField()
-    expenseAmount = models.FloatField()
+    amount = models.FloatField(blank=True, null=True)
+    expenseAmount = models.FloatField(blank=True, null=True)
     accountId = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions', blank=True, null=True)
     #accountName
-    tags = models.ManyToManyField('Tag', through='TransactionTag', related_name='transactions')
-    status = models.CharField(max_length=200)
-    isFutureDated = models.BooleanField(blank=True)
-    isPending = models.BooleanField(blank=True)
-    sortDate = models.DateField(blank=True)
+    tags = models.ManyToManyField('Tag', through='TransactionTag', related_name='transactions', blank=True, null=True)
+    status = models.CharField(max_length=200, blank=True, null=True)
+    isFutureDated = models.BooleanField(blank=True, null=True)
+    isPending = models.BooleanField(blank=True, null=True)
+    sortDate = models.DateField(blank=True, null=True)
     fromAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactionsFrom', blank=True, null=True)
     toAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactionsTo', blank=True, null=True)
     discrecionalidad = models.CharField(max_length=1 ,default=None,choices=DISCRECIONALIDADES, blank=True, null=True)
     cantPesos = models.FloatField(blank=True, null=True)
 
     class Meta:
-        ordering = ['-normalizedDate', 'description']
+        ordering = ['-date', 'description']
         # db_table = u'transaction'
 
     def __str__(self):
-        return 'fecha: {} cantidad: {} descripcion: {}'.format(self.normalizedDate, self.amount, self.description)
+        return 'fecha: {} cantidad: {} descripcion: {}'.format(self.date, self.amount, self.description)
 
 class TransactionTag(models.Model):
     id = models.IntegerField(primary_key=True)

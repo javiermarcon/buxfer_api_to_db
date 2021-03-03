@@ -10,6 +10,7 @@ from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
 from .models import Account, Tag, Transaction, DollarPrice, TIPOS_TAG_ORD, CAT_PRINCIPALES
 from .forms import AccountForm, TagForm, TransactionForm, EditDataForm
+from .utils import get_ars_amount
 from django.forms.models import modelformset_factory
 import pprint
 import re
@@ -245,7 +246,6 @@ def transactions_import(request):
     formSetClass = TransactionForm
     return data_import(request, action, model, serializerClass, formSetClass)
 
-
 def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
     '''Clasifica las transacciones para mostrar con totales'''
     data = {}
@@ -253,12 +253,12 @@ def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
     tipos_tag = {}
 
     if anio and mes:
-        transactions = Transaction.objects.filter(normalizedDate__year=anio, normalizedDate__month=mes).order_by(
-            '-normalizedDate')
+        transactions = Transaction.objects.filter(date__year=anio, date__month=mes).order_by(
+            '-date')
     elif anio:
-        transactions = Transaction.objects.filter(normalizedDate__year=anio).order_by('-normalizedDate')
+        transactions = Transaction.objects.filter(date__year=anio).order_by('-date')
     else:
-        transactions = Transaction.objects.order_by('-normalizedDate')
+        transactions = Transaction.objects.order_by('-date')
 
     for (key, value) in TIPOS_TAG_ORD:
         data[value] = {}
@@ -271,6 +271,9 @@ def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
     # import pdb;pdb.set_trace()
     for transaction in transactions:
         tags = transaction.tags.all()
+        if not transaction.cantPesos:
+            transaction.cantPesos = get_ars_amount(transaction)
+            transaction.save()
         if tags:
             tag = tags[0]
             if tag.tipo_tag and tag.categoria and tag.categoria in categorias:
@@ -296,10 +299,10 @@ def clasificar_transacciones(anio, mes, addDiscrecionalidad=False):
                     # dct['tipo_tag'] = tag.tipo_tag
                     dct['tipo_pago'] = transaction.accountId.tipo_pago
                     data[tiponame]['data'][catname]['data'][tag.name]['discrecionalidad'][transaction.id] = dct
-                data[tiponame]['data'][catname]['data'][tag.name]['total'] += transaction.amount
-                data[tiponame]['data'][catname]['total'] += transaction.amount
-                data[tiponame]['total'] += transaction.amount
-                total += transaction.amount
+                data[tiponame]['data'][catname]['data'][tag.name]['total'] += transaction.cantPesos
+                data[tiponame]['data'][catname]['total'] += transaction.cantPesos
+                data[tiponame]['total'] += transaction.cantPesos
+                total += transaction.cantPesos
 
     # import pdb; pdb.set_trace()
     show_data = [(x[1], data[x[1]]) for x in TIPOS_TAG_ORD]
@@ -354,7 +357,10 @@ def planilla_estado_financiero(request, anio=None, mes=None):
         for categoria, tags in item[1]['data'].items():
             for tag, transacciones in tags['data'].items():
                 for transaccion in transacciones['data']:
-                    sheetGastos["A{}".format(transactionLine)] = transaccion.normalizedDate  # fecha
+                    if not transaccion.cantPesos:
+                        transaccion.cantPesos = get_ars_amount(transaccion)
+                        transaccion.save()
+                    sheetGastos["A{}".format(transactionLine)] = transaccion.date  # fecha
                     sheetGastos["B{}".format(transactionLine)] = transaccion.description  # descripcion
                     sheetGastos["C{}".format(transactionLine)] = tags['data'][tag]['discrecionalidad'][transaccion.id][
                         'discrecionalidad']  # F/V/D
@@ -362,7 +368,7 @@ def planilla_estado_financiero(request, anio=None, mes=None):
                         'tipo_pago']  # $/T/C
                     sheetGastos["E{}".format(transactionLine)] = categoria  # cuenta
                     sheetGastos["F{}".format(transactionLine)] = tag  # subcuenta
-                    sheetGastos["G{}".format(transactionLine)] = transaccion.amount  # monto
+                    sheetGastos["G{}".format(transactionLine)] = transaccion.cantPesos  # monto
 
                     transactionLine += 1
             # pdb.set_trace()

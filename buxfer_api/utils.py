@@ -28,7 +28,8 @@ def transform_to_ars_currency(cantidad, fecha, currency='USD'):
     if currency == 'ARS':
         return cantidad
     try:
-        fecha = datetime.datetime.strptime(fecha, '%Y-%m-%d').date()
+        if not isinstance(fecha, (datetime, date)):
+            fecha = datetime.datetime.strptime(fecha, '%Y-%m-%d').date()
         func_name = 'transform_{}_ARS'.format(currency)
         return globals()[func_name](cantidad, fecha)
     except (KeyError, NameError):
@@ -43,3 +44,18 @@ def transform_to_ars_account(cantidad, fecha, id_cuenta):
         return transform_to_ars_currency(cantidad, fecha, cuenta.currency)
     except NameError:
         return cantidad
+
+
+def get_account(transaction):
+    if transaction.accountId:
+        return transaction.accountId.id
+    elif transaction.fromAccount:
+        return transaction.fromAccount.id
+    elif transaction.toAccount:
+        return transaction.toAccount.id
+    return None
+
+
+def get_ars_amount(transaction):
+    account = get_account(transaction)
+    return transform_to_ars_account(transaction.amount, transaction.date, account)

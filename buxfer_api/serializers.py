@@ -36,7 +36,7 @@ class TransactionSerializer(serializers.ModelSerializer):
     #depth=1
 
     def to_internal_value(self, data):
-        # import pdb;pdb.set_trace()
+        #import pdb;pdb.set_trace()
         if data['tagNames']:
             tags_qs = Q()
             for tag in data['tagNames']:
@@ -69,7 +69,7 @@ class TransactionSerializer(serializers.ModelSerializer):
                 acc = data['accountId']
             elif 'toAccount' in data:
                 acc = data['toAccount']
-            data['cantPesos'] = transform_to_ars_account(data['amount'], data['normalizedDate'], acc)
+            data['cantPesos'] = transform_to_ars_account(data['amount'], data['date'], acc)
         #print(data)
         return super(TransactionSerializer, self).to_internal_value(data)
 
@@ -80,7 +80,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Transaction
-        fields = ('id', 'description', 'normalizedDate', 'transactionType', 'amount', 'expenseAmount', 'accountId', 'tagNames', 'status',
+        fields = ('id', 'description', 'date', 'transactionType', 'amount', 'expenseAmount', 'accountId', 'tagNames', 'status',
                   'isFutureDated', 'isPending', 'sortDate', 'fromAccount', 'toAccount', 'cantPesos')
 
     def create(self, validated_data):
