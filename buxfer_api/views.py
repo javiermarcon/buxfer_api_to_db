@@ -10,7 +10,7 @@ from django.conf import settings
 from .serializers import AccountSerializer, TagSerializer, TransactionSerializer
 from .models import Account, Tag, Transaction, DollarPrice, TIPOS_TAG_ORD, CAT_PRINCIPALES
 from .forms import AccountForm, TagForm, TransactionForm, EditDataForm
-from .utils import get_ars_amount
+from .utils import get_ars_amount, transform_USD_ARS
 from django.forms.models import modelformset_factory
 import pprint
 import re
@@ -403,13 +403,15 @@ def fetch_precio_dolar(fecha):
     #
 
     api_call = get_api_call(["tc_usd_bna_mc15", "tc_usd_bna_mv15"], start_date=fecha)
+    print(api_call)
     result = requests.get(api_call).json()
+    print(result)
     if 'data' in result:
         return result['data']
     return []
 
 
-def precios_dolar(request, modo, anio=0, mes=0, dia=0):
+def add_precios_dolar(request, modo, anio=0, mes=0, dia=0):
     '''Obtener los precios del dolar oficial'''
     updated = []
     formato_fecha = '%Y-%m-%d'
@@ -442,3 +444,18 @@ def precios_dolar(request, modo, anio=0, mes=0, dia=0):
                 updated.append(linea)
 
     return render(request, "cotizacion/price_updated.html", {'updated': updated})
+
+def convertir_moneda(request, moneda_origen, moneda_destino, anio, mes, dia, cantidad, impuesto_pais=True):
+    conversiones = {'USD_ARS': transform_USD_ARS}
+    origen = moneda_origen.upper().strip()
+    destino = moneda_destino.upper().strip()
+    par = '{}_{}'.format(origen, destino)
+    fecha = datetime.date(anio, mes, dia)
+    monto = None
+    if par in conversiones:
+        monto = conversiones[par](cantidad, fecha, impuesto_pais)
+    return render(request, "cotizacion/conversion.html", {'monto': monto, 'origen': origen, 'destino': destino,
+                                                          'fecha': fecha, 'impuesto_pais': impuesto_pais,
+                                                          'cantidad': cantidad})
+
+convertir_moneda
