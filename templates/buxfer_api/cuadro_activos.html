@@ -111,7 +111,7 @@ Total General: {{ total|floatformat:2 }}
                             {% for transaccion in transacciones.data %}
                                 <tr>
                                     <td>
-                                        {{ transaccion.normalizedDate|date:"d/M/Y" }}
+                                        {{ transaccion.date|date:"d/M/Y" }}
                                     </td>
                                     <td>
                                         {{ transaccion.description }}
